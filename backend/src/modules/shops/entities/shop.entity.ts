@@ -1,1 +1,52 @@
-export class Shop {}
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { AccountStatus } from '@/modules/enums';
+import { User } from '@/modules/users/entities/user.entity';
+
+@Entity()
+export class Shop {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'seller_id' })
+  seller: User;
+
+  @Column({ nullable: false })
+  name: string;
+
+  @Column({ nullable: true })
+  logo_url: string;
+
+  @Column({ nullable: true })
+  banner_url: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ type: 'text', nullable: true })
+  bank_account_info: string;
+
+  @Column({ type: 'text', nullable: true })
+  pickup_address: string;
+
+  @Column({
+    type: 'enum',
+    enum: AccountStatus,
+    default: AccountStatus.PENDING_APPROVAL,
+  })
+  status: AccountStatus;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}

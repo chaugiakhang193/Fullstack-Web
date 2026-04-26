@@ -20,7 +20,7 @@ export class User {
   email: string;
 
   @Column({ nullable: false })
-  hashed_password: string;
+  password: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.CUSTOMER })
   role: UserRole;

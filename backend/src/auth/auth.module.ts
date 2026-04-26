@@ -2,8 +2,9 @@ import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '@/modules/users/users.module';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtService } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ACCESS_TOKEN_SERVICE, REFRESH_TOKEN_SERVICE } from './auth.constants';
 
 @Module({
   imports: [
@@ -12,21 +13,31 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       envFilePath: '.env',
     }),
     UsersModule,
-    UsersModule,
-
-    JwtModule.registerAsync({
-      global: true,
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<number>('TOKEN_EXPIRATION'),
-        },
-      }),
-    }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [
+    AuthService,
+    {
+      provide: ACCESS_TOKEN_SERVICE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        return new JwtService({
+          secret: config.get('JWT_ACCESS_SECRET'),
+          signOptions: { expiresIn: config.get('ACCESS_TOKEN_EXPIRATION') },
+        });
+      },
+    },
+
+    {
+      provide: REFRESH_TOKEN_SERVICE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        return new JwtService({
+          secret: config.get('JWT_REFRESH_SECRET'),
+          signOptions: { expiresIn: config.get('REFRESH_TOKEN_EXPIRATION') },
+        });
+      },
+    },
+  ],
 })
 export class AuthModule {}

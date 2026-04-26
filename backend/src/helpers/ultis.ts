@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
-const saltRounds = 10;
+import { Repository, FindOptionsWhere, ObjectLiteral } from 'typeorm';
 
+const saltRounds = 10;
 export const hashDataHelper = async (plainData: string) => {
   try {
     return await bcrypt.hash(plainData, saltRounds);
@@ -18,4 +19,15 @@ export const compareHashedDataHelper = async (
   } catch (error) {
     console.log(error);
   }
+};
+
+export const isDataExist = async <T extends ObjectLiteral>(
+  repository: Repository<T>,
+  condition: FindOptionsWhere<T>,
+): Promise<boolean> => {
+  const entity = await repository.findOne({
+    where: condition,
+  });
+
+  return !!entity;
 };

@@ -1,15 +1,18 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { RegisterDto, LoginDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { UsersService } from '@/modules/users/users.service';
 import { compareHashedDataHelper } from '@/helpers/ultis';
 import { JwtService } from '@nestjs/jwt';
+import { REFRESH_TOKEN_SERVICE } from './auth.constants';
+import { ACCESS_TOKEN_SERVICE } from './auth.constants';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
+    @Inject(ACCESS_TOKEN_SERVICE) private accessTokenService: JwtService,
+    @Inject(REFRESH_TOKEN_SERVICE) private refreshTokenService: JwtService,
   ) {}
 
   register(RegisterDto: RegisterDto) {
@@ -35,7 +38,8 @@ export class AuthService {
       username: existingUser.username,
     };
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: await this.accessTokenService.signAsync(payload),
+      refresh_token: await this.refreshTokenService.signAsync(payload),
     };
   }
   create(createAuthDto: RegisterDto) {

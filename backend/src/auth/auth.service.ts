@@ -1,16 +1,44 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { RegisterDto, LoginDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { UsersService } from '@/modules/users/users.service';
+import { compareHashedDataHelper } from '@/helpers/ultis';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
 
-  register(createAuthDto: CreateAuthDto) {
-    return this.usersService.handleRegister(createAuthDto);
+  register(RegisterDto: RegisterDto) {
+    return this.usersService.handleRegister(RegisterDto);
   }
-  create(createAuthDto: CreateAuthDto) {
+  async login(loginDto: LoginDto) {
+    const { username, password } = loginDto;
+
+    const existingUser = await this.usersService.findByUsername(username);
+
+    const isValidPassword =
+      existingUser &&
+      (await compareHashedDataHelper(password, existingUser.password));
+
+    if (!isValidPassword) {
+      throw new BadRequestException(
+        'Tài khoản hoặc mật khẩu của bạn không đúng',
+      );
+    }
+
+    const payload = {
+      id: existingUser.id,
+      username: existingUser.username,
+    };
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+    };
+  }
+  create(createAuthDto: RegisterDto) {
     return 'This action adds a new auth';
   }
 

@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { CreateAuthDto } from '@/auth/dto/create-auth.dto';
+import { RegisterDto, LoginDto } from '@/auth/dto/create-auth.dto';
 import { User } from '@/modules/users/entities/user.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { hashDataHelper, isDataExist } from '@/helpers/ultis';
+import {
+  hashDataHelper,
+  compareHashedDataHelper,
+  isDataExist,
+} from '@/helpers/ultis';
 
 @Injectable()
 export class UsersService {
@@ -22,9 +26,13 @@ export class UsersService {
     return false;
   }; */
 
-  async handleRegister(createAuthDto: CreateAuthDto) {
+  async findByUsername(username: string) {
+    return this.usersRepository.findOne({ where: { username } });
+  }
+
+  async handleRegister(registerDto: RegisterDto) {
     try {
-      const { username, password, email } = createAuthDto;
+      const { username, password, email } = registerDto;
 
       const isEmailExist = await isDataExist(this.usersRepository, { email });
 

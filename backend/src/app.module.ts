@@ -3,6 +3,8 @@ import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TransformInterceptor } from '@/interceptor/transform.interceptor';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 //modules
 import { AuthModule } from '@/auth/auth.module';
@@ -85,6 +87,12 @@ import { Notification } from './modules/engagements/entities/notification.entity
     }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
+    },
+  ],
 })
 export class AppModule {}

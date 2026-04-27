@@ -18,9 +18,9 @@ export class AuthService {
   register(RegisterDto: RegisterDto) {
     return this.usersService.handleRegister(RegisterDto);
   }
-  async login(loginDto: LoginDto) {
-    const { username, password } = loginDto;
 
+  // được gọi trong LocalStrategy để xác thực tài khoản khi đăng nhập
+  async validateUser(username: string, password: string): Promise<any> {
     const existingUser = await this.usersService.findByUsername(username);
 
     const isValidPassword =
@@ -28,20 +28,23 @@ export class AuthService {
       (await compareHashedDataHelper(password, existingUser.password));
 
     if (!isValidPassword) {
-      throw new BadRequestException(
+      return null;
+      /* throw new BadRequestException(
         'Tài khoản hoặc mật khẩu của bạn không đúng',
-      );
+      ); */
     }
+    const { password: _, ...userWithoutPassword } = existingUser;
+    return userWithoutPassword;
+  }
 
-    const payload = {
-      id: existingUser.id,
-      username: existingUser.username,
-    };
+  async handleLogin(user: any) {
+    const payload = { username: user.username, sub: user.id };
     return {
-      access_token: await this.accessTokenService.signAsync(payload),
-      refresh_token: await this.refreshTokenService.signAsync(payload),
+      access_token: this.accessTokenService.sign(payload),
+      refresh_token: this.refreshTokenService.sign(payload),
     };
   }
+
   create(createAuthDto: RegisterDto) {
     return 'This action adds a new auth';
   }

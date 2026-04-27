@@ -6,11 +6,18 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
+  Request,
+  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { ResponseMessage } from '@/decorator/customize';
+
+//Guards
+import { AuthGuard } from '@nestjs/passport';
+import { LocalAuthGuard } from './guard/local-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -22,10 +29,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @UseGuards(LocalAuthGuard)
   @Post('login')
   @ResponseMessage('Đăng nhập thành công')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Req() req) {
+    return this.authService.handleLogin(req.user);
   }
 
   @Post()

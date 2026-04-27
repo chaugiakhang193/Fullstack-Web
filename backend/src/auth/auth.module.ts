@@ -6,6 +6,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ACCESS_TOKEN_SERVICE, REFRESH_TOKEN_SERVICE } from './auth.constants';
 
+//Paspart strategies
+import { PassportModule } from '@nestjs/passport';
+import { LocalStrategy } from '@/auth/strategies/local.strategy';
+import { AccessTokenStrategy } from '@/auth/strategies/jwt-access.strategy';
+import { RefreshTokenStrategy } from '@/auth/strategies/jwt-refresh.strategy';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -13,10 +19,14 @@ import { ACCESS_TOKEN_SERVICE, REFRESH_TOKEN_SERVICE } from './auth.constants';
       envFilePath: '.env',
     }),
     UsersModule,
+    PassportModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
+    LocalStrategy,
+    AccessTokenStrategy,
+    RefreshTokenStrategy,
     {
       provide: ACCESS_TOKEN_SERVICE,
       inject: [ConfigService],

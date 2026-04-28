@@ -1,10 +1,18 @@
 import { Module } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
+import { AuthService } from '@/auth/auth.service';
+import { AuthController } from '@/auth/auth.controller';
 import { UsersModule } from '@/modules/users/users.module';
+
+//JWT
 import { JwtService } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ACCESS_TOKEN_SERVICE, REFRESH_TOKEN_SERVICE } from './auth.constants';
+import {
+  ACCESS_TOKEN_SERVICE,
+  REFRESH_TOKEN_SERVICE,
+} from '@/auth/auth.constants';
+
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Session } from '@/auth/entities/session.entity';
 
 //Paspart strategies
 import { PassportModule } from '@nestjs/passport';
@@ -20,6 +28,7 @@ import { RefreshTokenStrategy } from '@/auth/strategies/jwt-refresh.strategy';
     }),
     UsersModule,
     PassportModule,
+    TypeOrmModule.forFeature([Session]),
   ],
   controllers: [AuthController],
   providers: [

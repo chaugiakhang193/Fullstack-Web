@@ -37,6 +37,10 @@ import { Payment } from './modules/payments/entities/payment.entity';
 import { Review } from './modules/engagements/entities/review.entity';
 import { Notification } from './modules/engagements/entities/notification.entity';
 
+//Global Guard
+import { APP_GUARD } from '@nestjs/core';
+import { AccessTokenGuard } from './auth/guard/jwt-access-auth.guard';
+
 @Module({
   imports: [
     UsersModule,
@@ -92,6 +96,10 @@ import { Notification } from './modules/engagements/entities/notification.entity
     {
       provide: APP_INTERCEPTOR,
       useClass: TransformInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AccessTokenGuard,
     },
   ],
 })

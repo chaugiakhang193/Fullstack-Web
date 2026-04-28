@@ -13,7 +13,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
-import { ResponseMessage } from '@/decorator/customize';
+import { Public, ResponseMessage } from '@/decorator/customize';
 
 //Guards
 import { AuthGuard } from '@nestjs/passport';
@@ -23,12 +23,14 @@ import { LocalAuthGuard } from './guard/local-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('register')
   @ResponseMessage('Đăng ký tài khoản thành công')
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
+  @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @ResponseMessage('Đăng nhập thành công')

@@ -23,17 +23,10 @@ export class RegisterDto {
 
 export class LoginDto {
   @IsNotEmpty({ message: 'username không được để trống' })
-  @IsString({ message: 'username không được là một dãy số' })
-  @Matches(/.*[a-zA-Z].*/, {
-    message:
-      'username không hợp lệ. Phải chứa ít nhất một chữ cái, không được để toàn số.',
-  })
+  @IsString()
   username: string;
 
   @IsNotEmpty({ message: 'password không được để trống' })
-  @Matches(/.*[a-zA-Z].*/, {
-    message:
-      'password không hợp lệ. Phải chứa ít nhất một chữ cái, không được để toàn số.',
-  })
+  @IsString()
   password: string;
 }

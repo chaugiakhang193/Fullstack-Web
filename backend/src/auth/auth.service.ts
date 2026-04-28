@@ -1,8 +1,19 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { RegisterDto, LoginDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { RegisterDto, LoginDto } from '@/auth/dto/create-auth.dto';
+import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { UsersService } from '@/modules/users/users.service';
-import { compareHashedDataHelper } from '@/helpers/ultis';
+import { ConfigService } from '@nestjs/config';
+
+//typeorm
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Session } from '@/auth/entities/session.entity';
+
+//helpers
+import { compareHashedDataHelper, hashDataHelper } from '@/helpers/ultis';
+import ms from 'ms';
+
+//JWT
 import { JwtService } from '@nestjs/jwt';
 import { REFRESH_TOKEN_SERVICE } from './auth.constants';
 import { ACCESS_TOKEN_SERVICE } from './auth.constants';
@@ -10,7 +21,10 @@ import { ACCESS_TOKEN_SERVICE } from './auth.constants';
 @Injectable()
 export class AuthService {
   constructor(
+    @InjectRepository(Session)
+    private sessionRepository: Repository<Session>,
     private usersService: UsersService,
+    private configService: ConfigService,
     @Inject(ACCESS_TOKEN_SERVICE) private accessTokenService: JwtService,
     @Inject(REFRESH_TOKEN_SERVICE) private refreshTokenService: JwtService,
   ) {}
@@ -39,9 +53,30 @@ export class AuthService {
 
   async handleLogin(user: any) {
     const payload = { username: user.username, sub: user.id };
+
+    const accessToken = this.accessTokenService.sign(payload);
+    const refreshToken = this.refreshTokenService.sign(payload);
+
+    // Tính toán thời gian hết hạn của refresh token
+    const refreshTokenExpiration = this.configService.get(
+      'REFRESH_TOKEN_EXPIRATION',
+    );
+    const expiresAt = new Date(Date.now() + ms(refreshTokenExpiration));
+
+    //hash refresh token trước khi lưu vào database
+    const hashedRefreshToken = await hashDataHelper(refreshToken);
+
+    // Lưu refresh token và thời gian hết hạn vào cơ sở dữ liệu
+    const newSession = this.sessionRepository.create({
+      user: user,
+      refresh_token: hashedRefreshToken,
+      expires_at: expiresAt,
+    });
+    await this.sessionRepository.save(newSession);
+
     return {
-      access_token: this.accessTokenService.sign(payload),
-      refresh_token: this.refreshTokenService.sign(payload),
+      access_token: accessToken,
+      refresh_token: refreshToken,
     };
   }
 

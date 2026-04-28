@@ -5,6 +5,7 @@ export enum UserRole {
 }
 
 export enum AccountStatus {
+  PENDING_VERIFICATION = 'pending_verification',
   PENDING_APPROVAL = 'pending_approval',
   ACTIVE = 'active',
   SUSPENDED = 'suspended',

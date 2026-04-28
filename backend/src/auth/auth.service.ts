@@ -1,17 +1,22 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { RegisterDto, LoginDto } from '@/auth/dto/create-auth.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
+
 import { UsersService } from '@/modules/users/users.service';
 import { ConfigService } from '@nestjs/config';
+import { MailService } from '@/modules/mail/mail.service';
 
 //typeorm
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Session } from '@/auth/entities/session.entity';
+import { VerificationToken } from '@/auth/entities/verification-token.entity';
 
 //helpers
 import { compareHashedDataHelper, hashDataHelper } from '@/helpers/ultis';
 import ms from 'ms';
+import { v4 as uuidv4 } from 'uuid';
+import { VerificationTokenType } from '@/modules/enums';
 
 //JWT
 import { JwtService } from '@nestjs/jwt';
@@ -23,14 +28,32 @@ export class AuthService {
   constructor(
     @InjectRepository(Session)
     private sessionRepository: Repository<Session>,
+    @InjectRepository(VerificationToken)
+    private verificationTokenRepository: Repository<VerificationToken>,
     private usersService: UsersService,
+    private mailService: MailService,
     private configService: ConfigService,
     @Inject(ACCESS_TOKEN_SERVICE) private accessTokenService: JwtService,
     @Inject(REFRESH_TOKEN_SERVICE) private refreshTokenService: JwtService,
   ) {}
 
-  register(RegisterDto: RegisterDto) {
-    return this.usersService.handleRegister(RegisterDto);
+  async register(RegisterDto: RegisterDto) {
+    //tạo mới người dùng
+    const newUser = await this.usersService.create(RegisterDto);
+
+    //tạo token xác thực tài khoản và gửi email cho người dùng
+    const token = uuidv4();
+    const tokenExpiration = new Date(Date.now() + 5 * 60 * 1000);
+    const newVerificationToken = this.verificationTokenRepository.create({
+      user: newUser,
+      token: token,
+      type: VerificationTokenType.VERIFY_EMAIL,
+      expires_at: tokenExpiration,
+    });
+    await this.verificationTokenRepository.save(newVerificationToken);
+
+    //gửi email xác thực tài khoản
+    await this.mailService.sendVerifacationEmail(newUser, token);
   }
 
   // được gọi trong LocalStrategy để xác thực tài khoản khi đăng nhập

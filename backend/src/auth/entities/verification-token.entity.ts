@@ -6,6 +6,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '@/modules/users/entities/user.entity';
+import { VerificationTokenType } from '@/modules/enums';
 
 @Entity()
 export class VerificationToken {
@@ -19,8 +20,8 @@ export class VerificationToken {
   @Column({ nullable: true })
   token: string;
 
-  @Column({ nullable: true })
-  type: string;
+  @Column({ type: 'enum', enum: VerificationTokenType })
+  type: VerificationTokenType;
 
   @Column({ type: 'timestamp', nullable: true })
   expires_at: Date;

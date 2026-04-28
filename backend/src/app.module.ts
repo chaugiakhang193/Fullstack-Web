@@ -16,6 +16,7 @@ import { OrdersModule } from '@/modules/orders/orders.module';
 import { PromotionsModule } from '@/modules/promotions/promotions.module';
 import { PaymentsModule } from '@/modules/payments/payments.module';
 import { EngagementsModule } from '@/modules/engagements/engagements.module';
+import { MailModule } from '@/modules/mail/mail.module';
 
 //entities
 import { User } from '@/modules/users/entities/user.entity';
@@ -40,6 +41,10 @@ import { Notification } from './modules/engagements/entities/notification.entity
 //Global Guard
 import { APP_GUARD } from '@nestjs/core';
 import { AccessTokenGuard } from './auth/guard/jwt-access-auth.guard';
+
+//Mailer
+import { MailerModule } from '@nestjs-modules/mailer';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 
 @Module({
   imports: [

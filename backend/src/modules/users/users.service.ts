@@ -30,42 +30,33 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { username } });
   }
 
-  async handleRegister(registerDto: RegisterDto) {
-    try {
-      const { username, password, email } = registerDto;
+  async create(registerDto: RegisterDto) {
+    const { username, password, email } = registerDto;
 
-      const isEmailExist = await isDataExist(this.usersRepository, { email });
+    const isEmailExist = await isDataExist(this.usersRepository, { email });
 
-      if (isEmailExist) {
-        throw new BadRequestException(
-          'Email này đã được dùng để đăng ký tài khoản khác',
-        );
-      }
-
-      const isUsernameExist = await isDataExist(this.usersRepository, {
-        username,
-      });
-
-      if (isUsernameExist) {
-        throw new BadRequestException('Tên người dùng này đã được sử dụng');
-      }
-
-      const hashedPassword = await hashDataHelper(password);
-
-      const newUser = this.usersRepository.create({
-        username: username,
-        email: email,
-        password: hashedPassword,
-      });
-      return this.usersRepository.save(newUser);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw new BadRequestException('tạo tài khoản không thành công');
+    if (isEmailExist) {
+      throw new BadRequestException(
+        'Email này đã được dùng để đăng ký tài khoản khác',
+      );
     }
-  }
 
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+    const isUsernameExist = await isDataExist(this.usersRepository, {
+      username,
+    });
+
+    if (isUsernameExist) {
+      throw new BadRequestException('Tên người dùng này đã được sử dụng');
+    }
+
+    const hashedPassword = await hashDataHelper(password);
+
+    const newUser = this.usersRepository.create({
+      username: username,
+      email: email,
+      password: hashedPassword,
+    });
+    return this.usersRepository.save(newUser);
   }
 
   findAll(): Promise<User[]> {

@@ -41,3 +41,8 @@ export enum DiscountType {
   PERCENTAGE = 'percentage',
   FIXED_AMOUNT = 'fixed_amount',
 }
+
+export enum VerificationTokenType {
+  VERIFY_EMAIL = 'verify_email',
+  RESET_PASSWORD = 'reset_password',
+}

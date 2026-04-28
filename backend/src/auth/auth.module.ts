@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthService } from '@/auth/auth.service';
 import { AuthController } from '@/auth/auth.controller';
 import { UsersModule } from '@/modules/users/users.module';
+import { MailModule } from '@/modules/mail/mail.module';
 
 //JWT
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +14,7 @@ import {
 
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Session } from '@/auth/entities/session.entity';
+import { VerificationToken } from '@/auth/entities/verification-token.entity';
 
 //Paspart strategies
 import { PassportModule } from '@nestjs/passport';
@@ -27,8 +29,9 @@ import { RefreshTokenStrategy } from '@/auth/strategies/jwt-refresh.strategy';
       envFilePath: '.env',
     }),
     UsersModule,
+    MailModule,
     PassportModule,
-    TypeOrmModule.forFeature([Session]),
+    TypeOrmModule.forFeature([Session, VerificationToken]),
   ],
   controllers: [AuthController],
   providers: [

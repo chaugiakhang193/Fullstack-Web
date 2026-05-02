@@ -5,6 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
+import envConfig from "@/app/config";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils"; // Đừng quên import cn
 import { Button } from "@/components/ui/button";
@@ -24,7 +28,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-// 1. Định nghĩa lại Schema cho form Đăng ký
 const formSchema = z
   .object({
     username: z
@@ -52,7 +55,8 @@ export function RegisterForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  // 2. Khởi tạo form với các giá trị mặc định mới
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,21 +67,39 @@ export function RegisterForm({
     },
   });
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    toast("Bạn đã đăng ký với thông tin:", {
-      description: (
-        <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-slate-950 p-4 text-white">
-          <code>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-      position: "bottom-right",
-    });
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      const { confirmPassword, ...dataToSend } = data;
+      setIsLoading(true);
+      const res = await fetch(
+        `${envConfig.NEXT_PUBLIC_API_URL}/auth/register`,
+        {
+          method: "POST",
+          body: JSON.stringify(dataToSend),
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error("Đăng ký thất bại", {
+          description: result.message || "Thông tin không hợp lệ",
+        });
+        return;
+      }
 
-    // Tại đây sau này bạn sẽ gọi API sang backend NestJS:
-    // ví dụ: await authService.register(data)
+      toast.success("Tuyệt vời!", {
+        description: "Bạn đã tạo tài khoản thành công.",
+      });
+      router.push("/login");
+    } catch (error) {
+      toast.error("Đã có lỗi xảy ra khi đăng ký. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  // 3. Render giao diện bạn yêu cầu, đã được bọc Controller
   return (
     <div className={cn("flex flex-col gap-4 w-full", className)} {...props}>
       <Card className="flex flex-col w-full max-h-full  shadow-lg max-w-lg justify-center mx-auto">
@@ -105,6 +127,7 @@ export function RegisterForm({
                       {...field}
                       id="username"
                       placeholder="Nhập tên đăng nhập"
+                      disabled={isLoading}
                     />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
@@ -127,6 +150,7 @@ export function RegisterForm({
                       id="email"
                       type="email"
                       placeholder="m@example.com"
+                      disabled={isLoading}
                     />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
@@ -144,7 +168,12 @@ export function RegisterForm({
                     <FieldLabel htmlFor="password" className="text-sm">
                       Mật khẩu
                     </FieldLabel>
-                    <Input {...field} id="password" type="password" />
+                    <Input
+                      {...field}
+                      id="password"
+                      type="password"
+                      disabled={isLoading}
+                    />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
                     )}
@@ -161,7 +190,12 @@ export function RegisterForm({
                     <FieldLabel htmlFor="confirm-password">
                       Xác nhận mật khẩu
                     </FieldLabel>
-                    <Input {...field} id="confirm-password" type="password" />
+                    <Input
+                      {...field}
+                      id="confirm-password"
+                      type="password"
+                      disabled={isLoading}
+                    />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
                     )}
@@ -171,8 +205,15 @@ export function RegisterForm({
 
               {/* Phần mô tả mật khẩu và Nút Submit */}
               <div>
-                <Button type="submit" className="w-full">
-                  Tạo tài khoản
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    "Tạo tài khoản"
+                  )}
                 </Button>
               </div>
             </FieldGroup>

@@ -3,7 +3,7 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "@/app/globals.css";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/app/navmenu";
-
+import { Toaster } from "@/components/ui/sonner";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
@@ -33,6 +33,7 @@ export default function RootLayout({
       >
         <Navbar />
         {children}
+        <Toaster />
       </body>
     </html>
   );

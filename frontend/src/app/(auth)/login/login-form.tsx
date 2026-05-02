@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils"; // Đừng quên import cn
@@ -25,8 +25,11 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import envConfig from "@/app/config";
+import { Loader2 } from "lucide-react";
 
-// 1. Định nghĩa lại Schema cho form Đăng ký
+// 1. Định nghĩa lại Schema cho form Đăng nhập
 const formSchema = z.object({
   username: z.string().min(1, "Vui lòng nhập tên đăng nhập"),
   password: z.string().min(1, "Vui lòng nhập mật khẩu."),
@@ -36,7 +39,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  // 2. Khởi tạo form với các giá trị mặc định mới
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,18 +49,30 @@ export function LoginForm({
     },
   });
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    toast("Bạn đã đăng ký với thông tin:", {
-      description: (
-        <pre className="mt-2 w-[320px] overflow-x-auto rounded-md bg-slate-950 p-4 text-white">
-          <code>{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-      position: "bottom-right",
-    });
-
-    // Tại đây sau này bạn sẽ gọi API sang backend NestJS:
-    // ví dụ: await authService.register(data)
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      const dataToSend = data;
+      setIsLoading(true);
+      const res = await fetch(`${envConfig.NEXT_PUBLIC_API_URL}/auth/login`, {
+        method: "POST",
+        body: JSON.stringify(dataToSend),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error("Đăng nhập thất bại", {
+          description: result.message || "Thông tin không hợp lệ",
+        });
+        return;
+      }
+      router.push("/");
+    } catch (error) {
+      toast.error("Đã có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   // 3. Render giao diện bạn yêu cầu, đã được bọc Controller
@@ -68,7 +83,7 @@ export function LoginForm({
           <CardTitle className="text-2xl">Đăng nhập</CardTitle>
         </CardHeader>
         <CardContent>
-          <form id="register-form" onSubmit={form.handleSubmit(onSubmit)}>
+          <form id="login-form" onSubmit={form.handleSubmit(onSubmit)}>
             {/* CẤP ĐỘ 1: Dùng space-y-4 để cả 4 hàng cách đều nhau 1 khoảng 16px */}
             <FieldGroup>
               {/* 1. Field: Username */}
@@ -84,6 +99,7 @@ export function LoginForm({
                       {...field}
                       id="username"
                       placeholder="Nhập tên đăng nhập"
+                      disabled={isLoading}
                     />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
@@ -100,7 +116,12 @@ export function LoginForm({
                     <FieldLabel htmlFor="password" className="text-sm">
                       Mật khẩu
                     </FieldLabel>
-                    <Input {...field} id="password" type="password" />
+                    <Input
+                      {...field}
+                      id="password"
+                      type="password"
+                      disabled={isLoading}
+                    />
                     {fieldState.invalid && (
                       <FieldError errors={[fieldState.error]} />
                     )}
@@ -108,14 +129,22 @@ export function LoginForm({
                 )}
               />
               <div className="flex flex-col gap-2 pt-2">
-                <Button type="submit" className="w-full">
-                  Đăng nhập
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang đănh nhập...
+                    </>
+                  ) : (
+                    "Đăng nhập"
+                  )}
                 </Button>
 
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full"
+                  disabled={isLoading}
                   onClick={() => router.push("/register")}
                 >
                   Tạo tài khoản

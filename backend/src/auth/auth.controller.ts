@@ -9,15 +9,17 @@ import {
   UseGuards,
   Request,
   Req,
+  Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { Public, ResponseMessage } from '@/decorator/customize';
-
+import type { Response } from 'express';
 //Guards
 import { AuthGuard } from '@nestjs/passport';
 import { LocalAuthGuard } from './guard/local-auth.guard';
+import { RefreshTokenGuard } from './guard/jwt-refresh-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -34,8 +36,45 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @ResponseMessage('Đăng nhập thành công')
-  async login(@Req() req) {
-    return this.authService.handleLogin(req.user);
+  async login(@Req() req, @Res({ passthrough: true }) res: Response) {
+    const { access_token, refresh_token, cookie_max_age, user } =
+      await this.authService.handleLogin(req.user);
+
+    // Set refresh cookie vào cookie với HTTP only
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: Number(cookie_max_age),
+    });
+
+    return {
+      access_token,
+      user,
+    };
+  }
+
+  @Public()
+  @UseGuards(RefreshTokenGuard)
+  @Post('refresh')
+  async refreshTokens(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const userPayload = req.user;
+
+    const refreshToken = req.cookies['refresh_token'];
+    const { access_token, refresh_token, cookie_max_age } =
+      await this.authService.handleRefreshToken(userPayload, refreshToken);
+
+    res.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: Number(cookie_max_age),
+    });
+
+    return { access_token: access_token };
   }
 
   @Post()

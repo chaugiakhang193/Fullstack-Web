@@ -11,26 +11,27 @@ export class RefreshTokenStrategy extends PassportStrategy(
 ) {
   constructor(private configService: ConfigService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (request: Request) => {
+          const token = request?.cookies['refresh_token'];
+          return token || null;
+        },
+      ]),
       ignoreExpiration: false,
-
       secretOrKey: configService.get<string>('JWT_REFRESH_SECRET')!,
-
       passReqToCallback: true,
     });
   }
 
   async validate(req: Request, payload: any) {
-    const authorizationHeader = req.get('Authorization');
+    const refreshToken = req.cookies['refresh_token'];
 
-    if (!authorizationHeader) {
+    if (!refreshToken) {
       throw new ForbiddenException('Không tìm thấy Refresh Token');
     }
 
-    const refreshToken = authorizationHeader.replace('Bearer', '').trim();
-
     return {
-      ...payload,
+      ...payload, // user_id, session_id...
       refreshToken: refreshToken,
     };
   }

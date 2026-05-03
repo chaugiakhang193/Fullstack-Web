@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
-import { cn } from "@/lib/utils"; // Đừng quên import cn
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,7 +48,7 @@ const formSchema = z
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Mật khẩu xác nhận không khớp.",
-    path: ["confirmPassword"], // Hiển thị lỗi ở field confirmPassword
+    path: ["confirmPassword"],
   });
 
 export function RegisterForm({

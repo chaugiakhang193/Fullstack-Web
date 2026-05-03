@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { RegisterDto, LoginDto } from '@/auth/dto/create-auth.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 
@@ -74,32 +79,115 @@ export class AuthService {
     return userWithoutPassword;
   }
 
+  // Tạo AccessToken & RefreshToken
+  async createTokens(user: any, sessionId: string) {
+    // Access Token: Cần Role để làm Guard phân quyền
+    const atPayload = {
+      sub: user.id,
+      username: user.username,
+      role: user.role, // Luôn luôn chứa role
+    };
+
+    // Refresh Token: Chỉ cần ID và SessionId (Càng nhỏ càng bảo mật)
+    const rtPayload = {
+      sub: user.id,
+      sessionId: sessionId,
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.accessTokenService.signAsync(atPayload),
+      this.refreshTokenService.signAsync(rtPayload),
+    ]);
+
+    return { accessToken, refreshToken };
+  }
+
   async handleLogin(user: any) {
-    const payload = { username: user.username, sub: user.id };
-
-    const accessToken = this.accessTokenService.sign(payload);
-    const refreshToken = this.refreshTokenService.sign(payload);
-
+    const payload = { username: user.username, sub: user.id, role: user.role };
+    const sessionId = uuidv4();
+    const { accessToken, refreshToken } = await this.createTokens(
+      payload,
+      sessionId,
+    );
     // Tính toán thời gian hết hạn của refresh token
     const refreshTokenExpiration = this.configService.get(
       'REFRESH_TOKEN_EXPIRATION',
     );
-    const expiresAt = new Date(Date.now() + ms(refreshTokenExpiration));
+    const cookie_max_age = ms(refreshTokenExpiration);
+    const expiresAt = new Date(Date.now() + cookie_max_age);
 
     //hash refresh token trước khi lưu vào database
     const hashedRefreshToken = await hashDataHelper(refreshToken);
 
     // Lưu refresh token và thời gian hết hạn vào cơ sở dữ liệu
     const newSession = this.sessionRepository.create({
+      id: sessionId,
       user: user,
       refresh_token: hashedRefreshToken,
       expires_at: expiresAt,
     });
     await this.sessionRepository.save(newSession);
 
+    const { password, ...userWithoutPassword } = user;
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
+      cookie_max_age: cookie_max_age,
+      user: userWithoutPassword,
+    };
+  }
+
+  async handleRefreshToken(userPayload: any, originalRefreshToken: string) {
+    // 1. Tìm Session trực tiếp dựa vào payload (Lưu ý: payload từ JWT trả ra user id ở trường 'sub')
+    const session = await this.sessionRepository.findOne({
+      where: { id: userPayload.sessionId, user: { id: userPayload.sub } },
+      relations: ['user'],
+    });
+
+    if (!session) {
+      throw new UnauthorizedException(
+        'Phiên đăng nhập không tồn tại hoặc đã bị đăng xuất!',
+      );
+    }
+
+    //check Token xem có hợp lệ không
+    const isTokenMatch = await compareHashedDataHelper(
+      originalRefreshToken,
+      session.refresh_token,
+    );
+    if (!isTokenMatch) {
+      throw new UnauthorizedException(
+        'Refresh Token không hợp lệ (Bị đánh cắp hoặc đã xoay vòng)!',
+      );
+    }
+
+    const newPayload = {
+      username: session.user.username,
+      sub: session.user.id,
+      role: session.user.role,
+    };
+
+    const { accessToken, refreshToken } = await this.createTokens(
+      newPayload,
+      session.id,
+    );
+
+    const refreshTokenExpiration = this.configService.get(
+      'REFRESH_TOKEN_EXPIRATION',
+    );
+    const cookie_max_age = ms(refreshTokenExpiration);
+    const expiresAt = new Date(Date.now() + cookie_max_age); //tạo thời gian hết hạn refreshtoken mới
+
+    session.refresh_token = await hashDataHelper(refreshToken);
+    session.expires_at = expiresAt;
+
+    await this.sessionRepository.save(session);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      cookie_max_age: cookie_max_age,
     };
   }
 

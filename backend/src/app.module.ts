@@ -20,23 +20,23 @@ import { MailModule } from '@/modules/mail/mail.module';
 
 //entities
 import { User } from '@/modules/users/entities/user.entity';
-import { Address } from './modules/users/entities/address.entity';
+import { Address } from '@/modules/users/entities/address.entity';
 import { Session } from '@/auth/entities/session.entity';
-import { VerificationToken } from './auth/entities/verification-token.entity';
-import { Shop } from './modules/shops/entities/shop.entity';
-import { Payout } from './modules/shops/entities/payout.entity';
-import { Product } from './modules/products/entities/product.entity';
-import { ProductVariant } from './modules/products/entities/product-variant.entity';
-import { Category } from './modules/products/entities/category.entity';
-import { CartItem } from './modules/carts/entities/cart-item.entity';
-import { Order } from './modules/orders/entities/order.entity';
-import { SubOrder } from './modules/orders/entities/sub-order.entity';
-import { OrderItem } from './modules/orders/entities/order-item.entity';
-import { Coupon } from './modules/promotions/entities/coupon.entity';
-import { UserCoupon } from './modules/promotions/entities/user-coupon.entity';
-import { Payment } from './modules/payments/entities/payment.entity';
-import { Review } from './modules/engagements/entities/review.entity';
-import { Notification } from './modules/engagements/entities/notification.entity';
+import { VerificationToken } from '@/auth/entities/verification-token.entity';
+import { Shop } from '@/modules/shops/entities/shop.entity';
+import { Payout } from '@/modules/shops/entities/payout.entity';
+import { Product } from '@/modules/products/entities/product.entity';
+import { ProductVariant } from '@/modules/products/entities/product-variant.entity';
+import { Category } from '@/modules/products/entities/category.entity';
+import { CartItem } from '@/modules/carts/entities/cart-item.entity';
+import { Order } from '@/modules/orders/entities/order.entity';
+import { SubOrder } from '@/modules/orders/entities/sub-order.entity';
+import { OrderItem } from '@/modules/orders/entities/order-item.entity';
+import { Coupon } from '@/modules/promotions/entities/coupon.entity';
+import { UserCoupon } from '@/modules/promotions/entities/user-coupon.entity';
+import { Payment } from '@/modules/payments/entities/payment.entity';
+import { Review } from '@/modules/engagements/entities/review.entity';
+import { Notification } from '@/modules/engagements/entities/notification.entity';
 
 //Global Guard
 import { APP_GUARD } from '@nestjs/core';

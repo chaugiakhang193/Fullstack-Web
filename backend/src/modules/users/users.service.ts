@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { RegisterDto, LoginDto } from '@/auth/dto/create-auth.dto';
+import { RegisterDto } from '@/auth/dto/register.dto';
 import { User } from '@/modules/users/entities/user.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +27,10 @@ export class UsersService {
 
   async findByUsername(username: string) {
     return this.usersRepository.findOne({ where: { username } });
+  }
+
+  async findByEmail(userEmail: string) {
+    return this.usersRepository.findOne({ where: { email: userEmail } });
   }
 
   async create(registerDto: RegisterDto) {

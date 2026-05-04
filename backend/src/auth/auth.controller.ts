@@ -13,9 +13,14 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { AuthService } from '@/auth/auth.service';
+//DTO
+import { RegisterDto } from '@/auth/dto/register.dto';
+import { LoginDto } from '@/auth/dto/login.dto';
+import { VerifyEmailDto } from '@/auth/dto/verify-email.dto';
+import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
+import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
+
 import { Public, ResponseMessage } from '@/decorator/customize';
 import type { Response } from 'express';
 //Guards
@@ -36,6 +41,27 @@ export class AuthController {
   @ResponseMessage('Đăng ký tài khoản thành công')
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage(
+    'Mã kích hoạt mới đã được gửi. Vui lòng kiểm tra email của bạn.',
+  )
+  async resendVerification(@Body() resendDto: ResendVerificationEmailDto) {
+    return this.authService.resendVerificationEmail(resendDto);
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage(
+    'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.',
+  )
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return await this.authService.verifyEmailAndActivateUser(
+      verifyEmailDto.verification_token,
+    );
   }
 
   @Public()
@@ -75,18 +101,15 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Đăng xuất thành công, đã xóa phiên làm việc!')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies['refresh_token'];
 
     await this.authService.handleLogout(refreshToken);
 
     clearRefreshTokenCookie(res);
-
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Đăng xuất thành công, đã xóa phiên làm việc!',
-    };
   }
+
   @Post()
   create(@Body() createAuthDto: RegisterDto) {
     return this.authService.create(createAuthDto);

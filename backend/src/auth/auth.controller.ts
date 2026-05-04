@@ -10,6 +10,8 @@ import {
   Request,
   Req,
   Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto } from './dto/create-auth.dto';
@@ -20,6 +22,10 @@ import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { LocalAuthGuard } from './guard/local-auth.guard';
 import { RefreshTokenGuard } from './guard/jwt-refresh-auth.guard';
+import {
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} from '@/helpers/cookie.helper';
 
 @Controller('auth')
 export class AuthController {
@@ -41,12 +47,7 @@ export class AuthController {
       await this.authService.handleLogin(req.user);
 
     // Set refresh cookie vào cookie với HTTP only
-    res.cookie('refresh_token', refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: Number(cookie_max_age),
-    });
+    setRefreshTokenCookie(res, refresh_token, cookie_max_age);
 
     return {
       access_token,
@@ -67,16 +68,25 @@ export class AuthController {
     const { access_token, refresh_token, cookie_max_age } =
       await this.authService.handleRefreshToken(userPayload, refreshToken);
 
-    res.cookie('refresh_token', refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: Number(cookie_max_age),
-    });
+    setRefreshTokenCookie(res, refresh_token, cookie_max_age);
 
     return { access_token: access_token };
   }
 
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies['refresh_token'];
+
+    await this.authService.handleLogout(refreshToken);
+
+    clearRefreshTokenCookie(res);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Đăng xuất thành công, đã xóa phiên làm việc!',
+    };
+  }
   @Post()
   create(@Body() createAuthDto: RegisterDto) {
     return this.authService.create(createAuthDto);

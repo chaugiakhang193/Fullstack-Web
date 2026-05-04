@@ -139,7 +139,7 @@ export class AuthService {
   }
 
   async handleRefreshToken(userPayload: any, originalRefreshToken: string) {
-    // 1. Tìm Session trực tiếp dựa vào payload (Lưu ý: payload từ JWT trả ra user id ở trường 'sub')
+    //  Tìm Session trực tiếp dựa vào payload, sub là user id
     const session = await this.sessionRepository.findOne({
       where: { id: userPayload.sessionId, user: { id: userPayload.sub } },
       relations: ['user'],
@@ -189,6 +189,27 @@ export class AuthService {
       refresh_token: refreshToken,
       cookie_max_age: cookie_max_age,
     };
+  }
+
+  async handleLogout(refreshToken: string) {
+    if (!refreshToken) return;
+    try {
+      const payload = await this.refreshTokenService.verifyAsync(refreshToken);
+      const sessionId = payload.sessionId;
+      if (sessionId) {
+        const result = await this.sessionRepository.delete(sessionId);
+
+        if (result.affected === 0) {
+          console.log(`Session ${refreshToken} không tồn tại hoặc đã bị xóa.`);
+        }
+      }
+    } catch (error) {
+      console.log(
+        'Refresh token không hợp lệ hoặc đã hết hạn trong lúc Logout',
+      );
+    }
+
+    return { message: 'Đăng xuất thành công' };
   }
 
   create(createAuthDto: RegisterDto) {

@@ -12,17 +12,25 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  Put,
 } from '@nestjs/common';
+import type { Response } from 'express';
+
 import { AuthService } from '@/auth/auth.service';
+
 //DTO
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { LoginDto } from '@/auth/dto/login.dto';
 import { VerifyEmailDto } from '@/auth/dto/verify-email.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
+import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
 
 import { Public, ResponseMessage } from '@/decorator/customize';
-import type { Response } from 'express';
+
+//rate limit
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+
 //Guards
 import { AuthGuard } from '@nestjs/passport';
 import { LocalAuthGuard } from './guard/local-auth.guard';
@@ -38,13 +46,16 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
   @ResponseMessage('Đăng ký tài khoản thành công')
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
+  @Public()
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
   @ResponseMessage(
     'Mã kích hoạt mới đã được gửi. Vui lòng kiểm tra email của bạn.',
   )
@@ -55,6 +66,7 @@ export class AuthController {
   @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
   @ResponseMessage(
     'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.',
   )
@@ -67,6 +79,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ResponseMessage('Đăng nhập thành công')
   async login(@Req() req, @Res({ passthrough: true }) res: Response) {
     const { access_token, refresh_token, cookie_max_age, user } =
@@ -79,6 +92,18 @@ export class AuthController {
       access_token,
       user,
     };
+  }
+
+  @Put('change-password')
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @ResponseMessage('Đã đổi mật khẩu thành công và đăng xuất khỏi mọi thiết bị')
+  async changePassword(
+    @Req() req: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    // req.user được bóc ra từ JWT payload bởi Passport Strategy
+    const userId = req.user.sub;
+    return await this.authService.changePassword(userId, changePasswordDto);
   }
 
   @Public()

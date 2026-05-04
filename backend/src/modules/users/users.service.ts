@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  Injectable,
+} from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { User } from '@/modules/users/entities/user.entity';
@@ -24,15 +28,6 @@ export class UsersService {
     if (user) return true;
     return false;
   }; */
-
-  async findByUsername(username: string) {
-    return this.usersRepository.findOne({ where: { username } });
-  }
-
-  async findByEmail(userEmail: string) {
-    return this.usersRepository.findOne({ where: { email: userEmail } });
-  }
-
   async create(registerDto: RegisterDto) {
     const { username, password, email } = registerDto;
 
@@ -60,6 +55,40 @@ export class UsersService {
       password: hashedPassword,
     });
     return this.usersRepository.save(newUser);
+  }
+
+  async changeUserPassword(
+    userID: string,
+    old_password: string,
+    new_password: string,
+  ) {
+    //tìm user dựa trên userID xem có tồn tại không
+    const user = await this.usersRepository.findOne({ where: { id: userID } });
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+    // so sánh mật khẩu cũ do User cung cấp với mật khẩu đã hash lưu trong database
+    const isMatch = await compareHashedDataHelper(old_password, user.password);
+    if (!isMatch) {
+      throw new BadRequestException('Mật khẩu cũ không chính xác');
+    }
+
+    if (old_password === new_password) {
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+    }
+
+    //hash mật khẩu mới rồi cập nhật xuống database
+    const hashedNewPassword = await hashDataHelper(new_password);
+    user.password = hashedNewPassword;
+    await this.usersRepository.save(user);
+  }
+
+  async findByUsername(username: string) {
+    return this.usersRepository.findOne({ where: { username } });
+  }
+
+  async findByEmail(userEmail: string) {
+    return this.usersRepository.findOne({ where: { email: userEmail } });
   }
 
   findAll(): Promise<User[]> {

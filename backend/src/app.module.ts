@@ -42,12 +42,21 @@ import { Notification } from '@/modules/engagements/entities/notification.entity
 import { APP_GUARD } from '@nestjs/core';
 import { AccessTokenGuard } from './auth/guard/jwt-access-auth.guard';
 
+//rate limit
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+
 //Mailer
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     UsersModule,
     AuthModule,
     ShopsModule,
@@ -105,6 +114,10 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.ad
     {
       provide: APP_GUARD,
       useClass: AccessTokenGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

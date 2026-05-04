@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty({ message: 'username không được để trống' })
@@ -13,10 +19,12 @@ export class RegisterDto {
   @IsEmail()
   email: string;
 
-  @IsNotEmpty({ message: 'password không được để trống' })
+  @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+  @IsString({ message: 'Mật khẩu mới phải là chuỗi ký tự' })
+  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' }) // Gợi ý thêm
   @Matches(/.*[a-zA-Z].*/, {
     message:
-      'password không hợp lệ. Phải chứa ít nhất một chữ cái, không được để toàn số.',
+      'Mật khẩu mới không hợp lệ. Phải chứa ít nhất một chữ cái, không được để toàn số.',
   })
   password: string;
 }

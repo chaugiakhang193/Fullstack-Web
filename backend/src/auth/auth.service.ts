@@ -9,6 +9,7 @@ import {
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
+import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
 
 import { UsersService } from '@/modules/users/users.service';
 import { ConfigService } from '@nestjs/config';
@@ -67,7 +68,7 @@ export class AuthService {
     //kiểm tra xem tài khoản đã kích hoạt từ trước chưa
     if (user.status === AccountStatus.ACTIVE) {
       throw new BadRequestException(
-        'Tài khoản này đã được kích hoạt. Vui lòng đăng nhập.',
+        'Tài khoản này đã được kích hoạt từ trước.',
       );
     }
 
@@ -160,7 +161,12 @@ export class AuthService {
 
   // [POST] auth/login
   async handleLogin(user: any) {
-    const payload = { username: user.username, sub: user.id, role: user.role };
+    const payload = {
+      username: user.username,
+      id: user.id,
+      role: user.role,
+      status: user.status,
+    };
     const sessionId = uuidv4();
     const { accessToken, refreshToken } = await this.createTokens(
       payload,
@@ -195,6 +201,22 @@ export class AuthService {
     };
   }
 
+  // [PUT] /auth/change-password
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const { old_password, new_password } = changePasswordDto;
+    await this.usersService.changeUserPassword(
+      userId,
+      old_password,
+      new_password,
+    );
+    //sau khi đổi mật khẩu thành công mới chạy xuống xóa các session cũ, xóa hết refreshtoken cũ
+    await this.sessionRepository
+      .createQueryBuilder()
+      .delete()
+      .where('user_id = :id', { id: userId })
+      .execute();
+  }
+
   // [POST] auth/refresh
   async handleRefreshToken(userPayload: any, originalRefreshToken: string) {
     //  Tìm Session trực tiếp dựa vào payload, sub là user id
@@ -222,8 +244,9 @@ export class AuthService {
 
     const newPayload = {
       username: session.user.username,
-      sub: session.user.id,
+      id: session.user.id,
       role: session.user.role,
+      status: session.user.status,
     };
 
     const { accessToken, refreshToken } = await this.createTokens(
@@ -295,15 +318,18 @@ export class AuthService {
   // Tạo AccessToken & RefreshToken
   private async createTokens(user: any, sessionId: string) {
     // Access Token: Cần Role để làm Guard phân quyền
+    const { id, username, role, status } = user;
+    console.log(user);
     const atPayload = {
-      sub: user.id,
-      username: user.username,
-      role: user.role, // Luôn luôn chứa role
+      sub: id,
+      username: username,
+      role: role, // Luôn luôn chứa role
+      status: status,
     };
 
     // Refresh Token: Chỉ cần ID và SessionId (Càng nhỏ càng bảo mật)
     const rtPayload = {
-      sub: user.id,
+      sub: id,
       sessionId: sessionId,
     };
 

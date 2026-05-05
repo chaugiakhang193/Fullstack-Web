@@ -1,21 +1,44 @@
 // src/modules/mail/mail.service.ts
 import { MailerService } from '@nestjs-modules/mailer';
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MailService {
-  constructor(private mailerService: MailerService) {}
+  constructor(
+    private mailerService: MailerService,
+    private configService: ConfigService,
+  ) {}
 
-  //Gửi email token để người dùng xác thực tài khoản sau khi đăng ký
+  //Gửi email token để người dùng xác thực tài khoản sau khi đăng ký hoặc resend email khi người dùng hết hạn mã cũ
   async sendVerifacationEmail(user: any, verificationToken: string) {
     try {
       await this.mailerService.sendMail({
         to: user.email,
         subject: `Chào mừng ${user.username}! Hãy xác thực tài khoản của bạn`,
-        template: 'register',
+        template: 'verifacation-email',
         context: {
           name: user.username,
           verificationToken: verificationToken,
+        },
+      });
+    } catch (error) {
+      throw new BadRequestException(error);
+    }
+  }
+
+  async sendResetPasswordEmail(user: any, verificationToken: string) {
+    try {
+      //  Lấy URL Frontend từ .env và chuyển vào hbs
+      const FRONTEND_URL = this.configService.get<string>('FRONTEND_URL');
+      const resetLink = `${FRONTEND_URL}/reset-password?token=${verificationToken}`;
+      await this.mailerService.sendMail({
+        to: user.email,
+        subject: `Khôi phục mật khẩu tài khoản Giang Kha Shop`,
+        template: 'reset-password',
+        context: {
+          name: user.username,
+          resetLink: resetLink,
         },
       });
     } catch (error) {

@@ -10,13 +10,15 @@ import { RegisterDto } from '@/auth/dto/register.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
 import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
+import { ForgotPasswordDto } from '@/auth/dto/forgot-password.dto';
+import { ResetPasswordDto } from '@/auth/dto/reset-password.dto';
 
 import { UsersService } from '@/modules/users/users.service';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '@/modules/mail/mail.service';
 
 //typeorm
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, EntityManager } from 'typeorm';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Session } from '@/auth/entities/session.entity';
 import { VerificationToken } from '@/auth/entities/verification-token.entity';
@@ -125,8 +127,14 @@ export class AuthService {
       // Xóa Verification Token đã sử dụng
       await queryRunner.manager.remove(VerificationToken, verificationToken); // Lệnh DELETE
 
+      await queryRunner.manager.delete(Session, { user: { id: user.id } });
+      const sessionData = await this.generateAndSaveSession(
+        user,
+        queryRunner.manager,
+      );
       // commit khi 2 lệnh chạy trong database trên đều thành công
       await queryRunner.commitTransaction();
+      return sessionData; // trả về AT, RT, cookie_max_age, userwithoutpassword
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
@@ -161,44 +169,7 @@ export class AuthService {
 
   // [POST] auth/login
   async handleLogin(user: any) {
-    const payload = {
-      username: user.username,
-      id: user.id,
-      role: user.role,
-      status: user.status,
-    };
-    const sessionId = uuidv4();
-    const { accessToken, refreshToken } = await this.createTokens(
-      payload,
-      sessionId,
-    );
-    // Tính toán thời gian hết hạn của refresh token
-    const refreshTokenExpiration = this.configService.get(
-      'REFRESH_TOKEN_EXPIRATION',
-    );
-    const cookie_max_age = ms(refreshTokenExpiration);
-    const expiresAt = new Date(Date.now() + cookie_max_age);
-
-    //hash refresh token trước khi lưu vào database
-    const hashedRefreshToken = await hashDataHelper(refreshToken);
-
-    // Lưu refresh token và thời gian hết hạn vào cơ sở dữ liệu
-    const newSession = this.sessionRepository.create({
-      id: sessionId,
-      user: user,
-      refresh_token: hashedRefreshToken,
-      expires_at: expiresAt,
-    });
-    await this.sessionRepository.save(newSession);
-
-    const { password, ...userWithoutPassword } = user;
-
-    return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      cookie_max_age: cookie_max_age,
-      user: userWithoutPassword,
-    };
+    return await this.generateAndSaveSession(user);
   }
 
   // [PUT] /auth/change-password
@@ -215,6 +186,104 @@ export class AuthService {
       .delete()
       .where('user_id = :id', { id: userId })
       .execute();
+  }
+
+  // [POST] /auth/forgot-password
+  async handleForgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const { email } = forgotPasswordDto;
+
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      return;
+    }
+
+    // 3. Xóa các token reset cũ của user này (nếu có) để tránh rác DB
+    await this.verificationTokenRepository.delete({ user: { id: user.id } });
+
+    //tạo token xác thực tài khoản và gửi email cho người dùng
+    const resetToken = uuidv4();
+    const tokenExpiration = new Date(Date.now() + 15 * 60 * 1000);
+    const newVerificationToken = this.verificationTokenRepository.create({
+      user: user,
+      token: resetToken,
+      type: VerificationTokenType.RESET_PASSWORD,
+      expires_at: tokenExpiration,
+    });
+    await this.verificationTokenRepository.save(newVerificationToken);
+
+    await this.mailService.sendResetPasswordEmail(user, resetToken);
+
+    return;
+  }
+
+  // [POST] auth/reset-password
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const { token, new_password } = resetPasswordDto;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Tìm token và kèm theo thông tin user
+      const verificationToken = await queryRunner.manager.findOne(
+        VerificationToken,
+        {
+          where: { token: token },
+          relations: ['user'],
+        },
+      );
+
+      // Kiểm tra token có tồn tại và còn hạn không
+      if (!verificationToken) {
+        throw new BadRequestException(
+          'Đường dẫn khôi phục không hợp lệ hoặc đã được sử dụng.',
+        );
+      }
+      if (verificationToken.expires_at < new Date()) {
+        throw new BadRequestException(
+          'Đường dẫn khôi phục đã hết hạn. Vui lòng yêu cầu lại.',
+        );
+      }
+
+      const user = verificationToken.user;
+
+      // Hash mật khẩu mới và cập nhật thời gian
+      const hashedNewPassword = await hashDataHelper(new_password);
+      user.password = hashedNewPassword;
+      user.password_changed_at = new Date();
+
+      // Auto-active cho Customer đang bị pending
+      // (Bảo vệ an toàn: KHÔNG áp dụng cho Seller đang chờ duyệt)
+      if (user.role === 'customer' && user.status === 'pending_approval') {
+        user.status = AccountStatus.ACTIVE;
+      }
+
+      // Lưu User với thông tin mới
+      await queryRunner.manager.save(User, user);
+
+      // Xóa token vừa xài xong
+      await queryRunner.manager.remove(VerificationToken, verificationToken);
+
+      // Xóa toàn bộ Session cũ của User này
+      await queryRunner.manager.delete(Session, { user: { id: user.id } });
+
+      // Hoàn tất giao dịch
+      await queryRunner.commitTransaction();
+
+      return;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Lỗi hệ thống khi đặt lại mật khẩu.',
+      );
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   // [POST] auth/refresh
@@ -319,7 +388,6 @@ export class AuthService {
   private async createTokens(user: any, sessionId: string) {
     // Access Token: Cần Role để làm Guard phân quyền
     const { id, username, role, status } = user;
-    console.log(user);
     const atPayload = {
       sub: id,
       username: username,
@@ -355,5 +423,52 @@ export class AuthService {
 
     //gửi email xác thực tài khoản
     await this.mailService.sendVerifacationEmail(user, token);
+  }
+
+  private async generateAndSaveSession(user: any, manager?: EntityManager) {
+    //chuẩn bị payload và session ID để tạo AccessToken và RefreshToken
+    const payload = {
+      username: user.username,
+      id: user.id,
+      role: user.role,
+      status: user.status,
+    };
+    const sessionId = uuidv4();
+    const { accessToken, refreshToken } = await this.createTokens(
+      payload,
+      sessionId,
+    );
+
+    // Tính toán thời gian hết hạn của refresh token
+    const refreshTokenExpiration = this.configService.get(
+      'REFRESH_TOKEN_EXPIRATION',
+    );
+    const cookie_max_age = ms(refreshTokenExpiration);
+    const expiresAt = new Date(Date.now() + cookie_max_age);
+
+    //hash refresh token trước khi lưu vào database
+    const hashedRefreshToken = await hashDataHelper(refreshToken);
+
+    const session = new Session();
+    session.id = sessionId;
+    session.user = user;
+    session.refresh_token = hashedRefreshToken;
+    session.expires_at = expiresAt;
+
+    if (manager) {
+      //Lưu khi sử dụng transaction mà gọi hàm
+      await manager.save(Session, session);
+    } else {
+      await this.sessionRepository.save(session);
+    }
+
+    const { password, ...userWithoutPassword } = user;
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      cookie_max_age: cookie_max_age,
+      user: userWithoutPassword,
+    };
   }
 }

@@ -80,6 +80,7 @@ export class UsersService {
     //hash mật khẩu mới rồi cập nhật xuống database
     const hashedNewPassword = await hashDataHelper(new_password);
     user.password = hashedNewPassword;
+    user.password_changed_at = new Date();
     await this.usersRepository.save(user);
   }
 

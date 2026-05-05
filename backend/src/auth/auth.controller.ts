@@ -25,6 +25,8 @@ import { VerifyEmailDto } from '@/auth/dto/verify-email.dto';
 import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
 import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
+import { ForgotPasswordDto } from '@/auth/dto/forgot-password.dto';
+import { ResetPasswordDto } from '@/auth/dto/reset-password.dto';
 
 import { Public, ResponseMessage } from '@/decorator/customize';
 
@@ -33,8 +35,8 @@ import { Throttle, SkipThrottle } from '@nestjs/throttler';
 
 //Guards
 import { AuthGuard } from '@nestjs/passport';
-import { LocalAuthGuard } from './guard/local-auth.guard';
-import { RefreshTokenGuard } from './guard/jwt-refresh-auth.guard';
+import { LocalAuthGuard } from '@/auth/guard/local-auth.guard';
+import { RefreshTokenGuard } from '@/auth/guard/jwt-refresh-auth.guard';
 import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
@@ -70,10 +72,23 @@ export class AuthController {
   @ResponseMessage(
     'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.',
   )
-  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return await this.authService.verifyEmailAndActivateUser(
-      verifyEmailDto.verification_token,
-    );
+  async verifyEmail(
+    @Body() verifyEmailDto: VerifyEmailDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    //gọi hàm để xác thực mã Token trong Email, sau đó trả về 1 cặp AccessToken và RefreshToken để duy trì đăng nhập
+    const { access_token, refresh_token, cookie_max_age, user } =
+      await this.authService.verifyEmailAndActivateUser(
+        verifyEmailDto.verification_token,
+      );
+
+    // Set refresh cookie vào cookie với HTTP only
+    setRefreshTokenCookie(res, refresh_token, cookie_max_age);
+
+    return {
+      access_token,
+      user,
+    };
   }
 
   @Public()
@@ -96,7 +111,9 @@ export class AuthController {
 
   @Put('change-password')
   @Throttle({ default: { limit: 1, ttl: 60000 } })
-  @ResponseMessage('Đã đổi mật khẩu thành công và đăng xuất khỏi mọi thiết bị')
+  @ResponseMessage(
+    'Đã đổi mật khẩu thành công và đã đăng xuất khỏi mọi thiết bị',
+  )
   async changePassword(
     @Req() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -104,6 +121,25 @@ export class AuthController {
     // req.user được bóc ra từ JWT payload bởi Passport Strategy
     const userId = req.user.sub;
     return await this.authService.changePassword(userId, changePasswordDto);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @ResponseMessage(
+    'Yêu cầu thành công. Vui lòng kiểm tra hộp thư email của bạn.',
+  )
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return await this.authService.handleForgotPassword(forgotPasswordDto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Thiết lập mật khẩu mới thành công! Vui lòng đăng nhập lại.')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return await this.authService.resetPassword(resetPasswordDto);
   }
 
   @Public()

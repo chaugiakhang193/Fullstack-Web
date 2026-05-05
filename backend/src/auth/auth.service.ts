@@ -127,6 +127,7 @@ export class AuthService {
       // Xóa Verification Token đã sử dụng
       await queryRunner.manager.remove(VerificationToken, verificationToken); // Lệnh DELETE
 
+      //xóa tất cả token liên quan đến user này
       await queryRunner.manager.delete(Session, { user: { id: user.id } });
       const sessionData = await this.generateAndSaveSession(
         user,
@@ -168,7 +169,25 @@ export class AuthService {
   }
 
   // [POST] auth/login
-  async handleLogin(user: any) {
+  async handleLogin(user: any, oldRefreshToken: string) {
+    //nếu user có sẵn session ở thiết bị hiện tại thì xóa và cấp session mới, tránh rác database
+    if (oldRefreshToken) {
+      try {
+        //lấy sessionID từ payload trong refreshtoken user gửi lên
+        const refreshTokenPayload: any =
+          this.refreshTokenService.decode(oldRefreshToken);
+
+        //token hợp lệ thì xóa session cũ trước khi chạy vào hàm tạo session mới
+        if (refreshTokenPayload && refreshTokenPayload.sessionId) {
+          await this.sessionRepository.delete({
+            id: refreshTokenPayload.sessionId,
+          });
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
     return await this.generateAndSaveSession(user);
   }
 

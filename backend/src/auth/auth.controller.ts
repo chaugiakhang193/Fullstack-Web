@@ -97,8 +97,10 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ResponseMessage('Đăng nhập thành công')
   async login(@Req() req, @Res({ passthrough: true }) res: Response) {
+    //nếu đã login sẵn từ trước thì sẽ xóa session hiện tại tạo session mới tránh rác database
+    const oldRefreshToken = req.cookies['refresh_token'];
     const { access_token, refresh_token, cookie_max_age, user } =
-      await this.authService.handleLogin(req.user);
+      await this.authService.handleLogin(req.user, oldRefreshToken);
 
     // Set refresh cookie vào cookie với HTTP only
     setRefreshTokenCookie(res, refresh_token, cookie_max_age);

@@ -4,7 +4,6 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import * as z from "zod";
 import envConfig from "@/app/config";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -27,29 +26,11 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-
-const formSchema = z
-  .object({
-    username: z
-      .string()
-      .min(3, "Tên đăng nhập phải có ít nhất 3 ký tự.")
-      .max(32, "Tên đăng nhập tối đa 32 ký tự."),
-    email: z
-      .string()
-      .min(1, "Vui lòng nhập email.")
-      .email("Email không đúng định dạng."),
-    password: z
-      .string()
-      .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
-      .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
-      .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
-      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
-    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu."),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Mật khẩu xác nhận không khớp.",
-    path: ["confirmPassword"],
-  });
+import {
+  RegisterBody,
+  RegisterBodyType,
+} from "@/schemaValidations/auth.schema";
+import authApiRequest from "@/apiRequests/auth";
 
 export function RegisterForm({
   className,
@@ -57,8 +38,9 @@ export function RegisterForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<RegisterBodyType>({
+    resolver: zodResolver(RegisterBody),
+    mode: "onTouched",
     defaultValues: {
       username: "",
       email: "",
@@ -67,34 +49,23 @@ export function RegisterForm({
     },
   });
 
-  async function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: RegisterBodyType) {
     try {
-      const { confirmPassword, ...dataToSend } = data;
       setIsLoading(true);
-      const res = await fetch(
-        `${envConfig.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          body: JSON.stringify(dataToSend),
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      );
-      const result = await res.json();
-      if (!res.ok) {
-        toast.error("Đăng ký thất bại", {
-          description: result.message || "Thông tin không hợp lệ",
-        });
-        return;
-      }
+      const { confirmPassword, ...dataToSend } = data;
+      const res = await authApiRequest.register(dataToSend);
 
       toast.success("Tuyệt vời!", {
-        description: "Bạn đã tạo tài khoản thành công.",
+        description: res.message || "Bạn đã tạo tài khoản thành công.",
       });
       router.push("/login");
     } catch (error) {
-      toast.error("Đã có lỗi xảy ra khi đăng ký. Vui lòng thử lại.");
+      const httpError = error as { payload?: { message?: string } };
+      toast.error("Đăng ký thất bại", {
+        description:
+          httpError.payload?.message ||
+          "Đã có lỗi xảy ra khi đăng ký. Vui lòng thử lại.",
+      });
     } finally {
       setIsLoading(false);
     }

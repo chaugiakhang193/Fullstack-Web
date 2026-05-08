@@ -330,11 +330,19 @@ export class AuthService {
       );
     }
 
+    // Tìm kiếm thông tin mới nhất về người dùng thông qua session.user.id
+    // để đảm bảo user chưa bị xóa hoặc cập nhật role/status
+    const user = await this.usersService.findById(session.user.id);
+    if (!user) {
+      throw new UnauthorizedException(
+        'Tài khoản người dùng không còn tồn tại!',
+      );
+    }
     const newPayload = {
-      username: session.user.username,
-      id: session.user.id,
-      role: session.user.role,
-      status: session.user.status,
+      username: user.username,
+      id: user.id,
+      role: user.role,
+      status: user.status,
     };
 
     const { accessToken, refreshToken } = await this.createTokens(
@@ -352,11 +360,12 @@ export class AuthService {
     session.expires_at = expiresAt;
 
     await this.sessionRepository.save(session);
-
+    const { password, ...userWithoutPassword } = user;
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
       cookie_max_age: cookie_max_age,
+      userWithoutPassword: userWithoutPassword,
     };
   }
 

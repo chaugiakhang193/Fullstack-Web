@@ -1,6 +1,7 @@
 import z from "zod";
 import { UserRole, AccountStatus } from "@/lib/enum";
 
+// Định nghĩa User
 export const UserSchema = z.object({
   id: z.string(),
   username: z.string(),
@@ -14,6 +15,15 @@ export const UserSchema = z.object({
   updated_at: z.string(),
 });
 
+// Đăng nhập (login)
+export const LoginBody = z
+  .object({
+    username: z.string().min(1, "Tên đăng nhập phải có ít nhất 3 ký tự."),
+    password: z.string().min(1, "Vui lòng nhập mật khẩu."),
+  })
+  .strict();
+
+// Đăng ký tài khoản mới (register)
 export const RegisterBody = z
   .object({
     username: z
@@ -41,12 +51,60 @@ export const RegisterBody = z
     path: ["confirmPassword"],
   });
 
-export const LoginBody = z
+// Quên mật khẩu (forgot-password)
+export const ForgotPasswordBody = z.object({
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập email.")
+    .email("Email không đúng định dạng."),
+});
+
+// Đặt lại mật khẩu (reset-password)
+export const ResetPasswordBody = z
   .object({
-    username: z.string().min(1, "Tên đăng nhập phải có ít nhất 3 ký tự."),
-    password: z.string().min(1, "Vui lòng nhập mật khẩu."),
+    token: z.string().min(1, "Token không hợp lệ"),
+    new_password: z
+      .string()
+      .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
+      .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
+      .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
+      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
+    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu."),
   })
-  .strict();
+  .refine((data) => data.new_password === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp.",
+    path: ["confirmPassword"],
+  });
+
+// Đổi mật khẩu (change-password)
+export const ChangePasswordBody = z
+  .object({
+    old_password: z.string().min(1, "Vui lòng nhập mật khẩu cũ"),
+    new_password: z
+      .string()
+      .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
+      .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
+      .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
+      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
+    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu mới."),
+  })
+  .refine((data) => data.new_password === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp.",
+    path: ["confirmPassword"],
+  });
+
+// Gửi lại Email xác thực (resend-verification)
+export const ResendVerificationBody = z.object({
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập email.")
+    .email("Email không đúng định dạng."),
+});
+
+// Xác thực Email (verify-email)
+export const VerifyEmailBody = z.object({
+  verification_token: z.string().min(1, "Mã xác thực không hợp lệ"),
+});
 
 export const AuthRes = z.object({
   //statusCode: z.number().optional(),
@@ -64,3 +122,20 @@ export type RegisterResType = z.TypeOf<typeof AuthRes>;
 
 export type LoginBodyType = z.TypeOf<typeof LoginBody>;
 export type LoginResType = z.TypeOf<typeof AuthRes>;
+
+export type ForgotPasswordBodyType = z.TypeOf<typeof ForgotPasswordBody>;
+export type ForgotPasswordResType = z.TypeOf<typeof AuthRes>;
+
+export type ResetPasswordBodyType = z.TypeOf<typeof ResetPasswordBody>;
+export type ResetPasswordResType = z.TypeOf<typeof AuthRes>;
+
+export type ChangePasswordBodyType = z.TypeOf<typeof ChangePasswordBody>;
+export type ChangePasswordResType = z.TypeOf<typeof AuthRes>;
+
+export type ResendVerificationBodyType = z.TypeOf<
+  typeof ResendVerificationBody
+>;
+export type ResendVerificationResType = z.TypeOf<typeof AuthRes>;
+
+export type VerifyEmailBodyType = z.TypeOf<typeof VerifyEmailBody>;
+export type VerifyEmailResType = z.TypeOf<typeof AuthRes>;

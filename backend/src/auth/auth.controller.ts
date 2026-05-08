@@ -154,12 +154,12 @@ export class AuthController {
     const userPayload = req.user;
 
     const refreshToken = req.cookies['refresh_token'];
-    const { access_token, refresh_token, cookie_max_age } =
+    const { access_token, refresh_token, cookie_max_age, userWithoutPassword } =
       await this.authService.handleRefreshToken(userPayload, refreshToken);
 
     setRefreshTokenCookie(res, refresh_token, cookie_max_age);
 
-    return { access_token: access_token };
+    return { access_token: access_token, user: userWithoutPassword };
   }
 
   @Post('logout')

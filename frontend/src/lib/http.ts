@@ -119,7 +119,12 @@ const request = async <Response>(
     } catch (error) {
       // Refresh thất bại (Cookie hết hạn) -> Đá văng ra login
       useAuthStore.getState().logout();
-      if (typeof window !== "undefined") window.location.href = "/login";
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
+        window.location.href = "/login";
+      }
       throw new HttpError({
         status: 401,
         payload: { message: "Phiên đăng nhập đã hết hạn" },
@@ -134,6 +139,15 @@ const request = async <Response>(
     // Nếu là lỗi Validation từ NestJS (Class Validator thường trả 400, một số trường hợp là 422)
     if (res.status === 422 || res.status === 400) {
       throw new EntityError({ status: res.status as 422 | 400, payload });
+    }
+    if (res.status === 401) {
+      if (url === "/auth/login" || url === "/auth/refresh") {
+        throw new HttpError({ status: 401, payload });
+      }
+      throw new HttpError({
+        status: 401,
+        payload: { message: "Phiên đăng nhập đã hết hạn" },
+      });
     }
     throw new HttpError({ status: res.status, payload });
   }

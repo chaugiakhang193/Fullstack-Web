@@ -4,6 +4,7 @@ import "@/app/globals.css";
 import { cn } from "@/lib/utils";
 import { Navbar } from "@/app/navmenu";
 import { Toaster } from "@/components/ui/sonner";
+import AppProvider from "./app-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
@@ -27,12 +28,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
+    <html
+      lang="en"
+      suppressHydrationWarning={true}
+      className={cn("font-sans", inter.variable)}
+    >
       <body
+        suppressHydrationWarning={true}
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Navbar />
-        {children}
+        <AppProvider>{children}</AppProvider>
         <Toaster />
       </body>
     </html>

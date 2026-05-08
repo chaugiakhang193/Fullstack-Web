@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { User } from "@/types/user.type";
+import { AccountType } from "@/schemaValidations/auth.schema";
 
 interface AuthState {
-  user: User | null;
+  user: AccountType | null;
   accessToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: User, token: string) => void;
+  setAuth: (user: AccountType, token: string) => void;
   setAccessToken: (token: string) => void;
   logout: () => void;
 }

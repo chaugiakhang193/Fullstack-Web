@@ -4,12 +4,15 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import * as z from "zod";
-
 import { useRouter } from "next/navigation";
-
-import { cn } from "@/lib/utils"; // Đừng quên import cn
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+//API fetch heplers
+import authApiRequest from "@/apiRequests/auth";
+//Store
+import { useAuthStore } from "@/store/useAuthStore";
+
+//Components
 import {
   Card,
   CardContent,
@@ -25,15 +28,9 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import envConfig from "@/app/config";
+import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
-
-// 1. Định nghĩa lại Schema cho form Đăng nhập
-const formSchema = z.object({
-  username: z.string().min(1, "Vui lòng nhập tên đăng nhập"),
-  password: z.string().min(1, "Vui lòng nhập mật khẩu."),
-});
+import { LoginBody, LoginBodyType } from "@/schemaValidations/auth.schema";
 
 export function LoginForm({
   className,
@@ -41,36 +38,70 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  //Tạo một BroadcastChannel với useRef
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  //Nếu đã login từ trước thì lấy accesstoken ra và redirect người dùng
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  //Nếu có accessToken trong RAM qua Zustand thì redirect
+  useEffect(() => {
+    if (accessToken) {
+      router.push("/");
+    }
+  }, [accessToken, router]);
+
+  //Tạo broadcast channel thông báo cho các tab khác biết và redirect người dùng
+  //Dùng channelRef để tab thực hiện đăng nhập không báo "Đã đăng nhập tab khác"
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel("auth-channel");
+    channelRef.current.onmessage = (event) => {
+      if (event.data === "login_success") {
+        toast.info("Đã đăng nhập thành công ở một tab khác!");
+        router.push("/");
+      }
+    };
+    return () => {
+      channelRef.current?.close();
+    };
+  }, [router]);
+
+  //Form được khởi tạo
+  const form = useForm<LoginBodyType>({
+    resolver: zodResolver(LoginBody),
+    mode: "onTouched",
     defaultValues: {
       username: "",
       password: "",
     },
   });
 
-  async function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: LoginBodyType) {
     try {
       const dataToSend = data;
       setIsLoading(true);
-      const res = await fetch(`${envConfig.NEXT_PUBLIC_API_URL}/auth/login`, {
-        method: "POST",
-        body: JSON.stringify(dataToSend),
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const res = await authApiRequest.login(dataToSend);
+      const UserInfo = res.data.user;
+      const access_token = res.data.access_token;
+      console.log(res);
+      setAuth(UserInfo, access_token);
+      toast.success("Đăng nhập thành công!", {
+        description: res.message || "Chào mừng bạn quay trở lại.",
       });
-      const result = await res.json();
-      if (!res.ok) {
-        toast.error("Đăng nhập thất bại", {
-          description: result.message || "Thông tin không hợp lệ",
-        });
-        return;
-      }
+
+      //Khi đăng nhập xong tạo một message để báo cho các tab khác
+      channelRef.current?.postMessage("login_success");
+
       router.push("/");
     } catch (error) {
-      toast.error("Đã có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.");
-    } finally {
+      const httpError = error as { payload?: { message?: string } };
+
+      toast.error("Đăng nhập thất bại", {
+        description:
+          httpError.payload?.message ||
+          "Thông tin không hợp lệ. Vui lòng thử lại.",
+      });
       setIsLoading(false);
     }
   }

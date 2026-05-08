@@ -1,4 +1,18 @@
 import z from "zod";
+import { UserRole, AccountStatus } from "@/lib/enum";
+
+export const UserSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  email: z.string().email(),
+  role: z.nativeEnum(UserRole),
+  status: z.nativeEnum(AccountStatus),
+  full_name: z.string().nullable(),
+  phone: z.string().nullable(),
+  password_changed_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
 
 export const RegisterBody = z
   .object({
@@ -29,23 +43,21 @@ export const RegisterBody = z
 
 export const LoginBody = z
   .object({
-    email: z.string().email(),
-    password: z.string().min(6).max(100),
+    username: z.string().min(1, "Tên đăng nhập phải có ít nhất 3 ký tự."),
+    password: z.string().min(1, "Vui lòng nhập mật khẩu."),
   })
   .strict();
 
 export const AuthRes = z.object({
+  //statusCode: z.number().optional(),
   data: z.object({
-    token: z.string(),
-    expiresAt: z.string(),
-    account: z.object({
-      id: z.number(),
-      name: z.string(),
-      email: z.string(),
-    }),
+    access_token: z.string(),
+    user: UserSchema,
   }),
   message: z.string(),
 });
+
+export type AccountType = z.infer<typeof UserSchema>;
 
 export type RegisterBodyType = z.TypeOf<typeof RegisterBody>;
 export type RegisterResType = z.TypeOf<typeof AuthRes>;

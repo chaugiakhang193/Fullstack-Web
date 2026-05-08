@@ -4,9 +4,8 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import envConfig from "@/app/config";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -31,6 +30,8 @@ import {
   RegisterBodyType,
 } from "@/schemaValidations/auth.schema";
 import authApiRequest from "@/apiRequests/auth";
+//Store
+import { useAuthStore } from "@/store/useAuthStore";
 
 export function RegisterForm({
   className,
@@ -38,6 +39,29 @@ export function RegisterForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  //Nếu đã login từ trước thì lấy accesstoken ra và redirect người dùng
+  const accessToken = useAuthStore((state) => state.accessToken);
+  //Nếu có accessToken trong RAM qua Zustand thì redirect
+  useEffect(() => {
+    if (accessToken) {
+      router.push("/");
+    }
+  }, [accessToken, router]);
+
+  //Tạo broadcast channel thông báo cho các tab khác biết và redirect người dùng
+  useEffect(() => {
+    const channel = new BroadcastChannel("auth-channel");
+
+    channel.onmessage = (event) => {
+      if (event.data === "login_success") {
+        toast.info("Tài khoản đã được đăng nhập ở tab khác!");
+        router.push("/");
+      }
+    };
+    return () => channel.close();
+  }, [router]);
+  //Khởi tạo Form
   const form = useForm<RegisterBodyType>({
     resolver: zodResolver(RegisterBody),
     mode: "onTouched",
@@ -54,7 +78,6 @@ export function RegisterForm({
       setIsLoading(true);
       const { confirmPassword, ...dataToSend } = data;
       const res = await authApiRequest.register(dataToSend);
-
       toast.success("Tuyệt vời!", {
         description: res.message || "Bạn đã tạo tài khoản thành công.",
       });

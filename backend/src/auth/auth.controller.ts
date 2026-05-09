@@ -14,7 +14,17 @@ import {
   HttpStatus,
   Put,
 } from '@nestjs/common';
+
 import type { Response } from 'express';
+
+//swagger
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 
 import { AuthService } from '@/auth/auth.service';
 
@@ -22,13 +32,17 @@ import { AuthService } from '@/auth/auth.service';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { LoginDto } from '@/auth/dto/login.dto';
 import { VerifyEmailDto } from '@/auth/dto/verify-email.dto';
-import { UpdateAuthDto } from '@/auth/dto/update-auth.dto';
 import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email.dto';
 import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
 import { ForgotPasswordDto } from '@/auth/dto/forgot-password.dto';
 import { ResetPasswordDto } from '@/auth/dto/reset-password.dto';
+import { AuthResponseDto } from '@/auth/dto/auth-response.dto';
 
 import { Public, ResponseMessage } from '@/decorator/customize';
+
+// Sinh tài liệu response api chung cho DOCS SWAGGER
+// API resonse mặc định của Swagger dùng chuyên để trả lỗi
+import { ApiGenericResponse } from '@/decorator/api-response.decorator';
 
 //rate limit
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
@@ -42,6 +56,7 @@ import {
   clearRefreshTokenCookie,
 } from '@/helpers/cookie.helper';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -50,6 +65,15 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 1, ttl: 60000 } })
   @ResponseMessage('Đăng ký tài khoản thành công')
+  @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
+  @ApiGenericResponse('Đăng ký thành công, vui lòng kiểm tra email.', {
+    status: 201,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Dữ liệu đầu vào không hợp lệ hoặc tài khoản/email đã tồn tại.',
+  })
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
@@ -61,6 +85,12 @@ export class AuthController {
   @ResponseMessage(
     'Mã kích hoạt mới đã được gửi. Vui lòng kiểm tra email của bạn.',
   )
+  @ApiOperation({ summary: 'Gửi lại email xác thực tài khoản' })
+  @ApiGenericResponse('Đã gửi lại email xác thực.')
+  @ApiResponse({
+    status: 400,
+    description: 'Email không tồn tại hoặc tài khoản đã kích hoạt.',
+  })
   async resendVerification(@Body() resendDto: ResendVerificationEmailDto) {
     return this.authService.resendVerificationEmail(resendDto);
   }
@@ -72,6 +102,15 @@ export class AuthController {
   @ResponseMessage(
     'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.',
   )
+  @ApiOperation({ summary: 'Xác thực tài khoản bằng mã từ email' })
+  @ApiGenericResponse(
+    AuthResponseDto,
+    'Xác thực thành công và tự động đăng nhập (trả về access_token).',
+  )
+  @ApiResponse({
+    status: 400,
+    description: 'Mã xác thực không hợp lệ hoặc đã hết hạn.',
+  })
   async verifyEmail(
     @Body() verifyEmailDto: VerifyEmailDto,
     @Res({ passthrough: true }) res: Response,
@@ -96,6 +135,14 @@ export class AuthController {
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ResponseMessage('Đăng nhập thành công')
+  @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
+  @ApiBody({ type: LoginDto })
+  @ApiGenericResponse(
+    AuthResponseDto,
+    'Đăng nhập thành công, trả về access_token và set refresh_token vào cookie.',
+    { status: 201 },
+  )
+  @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
   async login(@Req() req, @Res({ passthrough: true }) res: Response) {
     //nếu đã login sẵn từ trước thì sẽ xóa session hiện tại tạo session mới tránh rác database
     const oldRefreshToken = req.cookies['refresh_token'];
@@ -112,10 +159,15 @@ export class AuthController {
   }
 
   @Put('change-password')
+  @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 1, ttl: 60000 } })
   @ResponseMessage(
     'Đã đổi mật khẩu thành công và đã đăng xuất khỏi mọi thiết bị',
   )
+  @ApiOperation({ summary: 'Đổi mật khẩu (Cần đăng nhập)' })
+  @ApiGenericResponse('Đổi mật khẩu thành công.')
+  @ApiResponse({ status: 401, description: 'Không có quyền truy cập.' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu cũ không chính xác.' })
   async changePassword(
     @Req() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
@@ -132,6 +184,8 @@ export class AuthController {
   @ResponseMessage(
     'Yêu cầu thành công. Vui lòng kiểm tra hộp thư email của bạn.',
   )
+  @ApiOperation({ summary: 'Quên mật khẩu (gửi email khôi phục)' })
+  @ApiGenericResponse('Đã gửi email khôi phục.')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return await this.authService.handleForgotPassword(forgotPasswordDto);
   }
@@ -140,6 +194,12 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Thiết lập mật khẩu mới thành công! Vui lòng đăng nhập lại.')
+  @ApiOperation({ summary: 'Đặt lại mật khẩu mới' })
+  @ApiGenericResponse('Đặt lại mật khẩu thành công.')
+  @ApiResponse({
+    status: 400,
+    description: 'Token khôi phục không hợp lệ hoặc đã hết hạn.',
+  })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return await this.authService.resetPassword(resetPasswordDto);
   }
@@ -147,6 +207,14 @@ export class AuthController {
   @Public()
   @UseGuards(RefreshTokenGuard)
   @Post('refresh')
+  @ApiOperation({ summary: 'Cấp lại Access Token mới bằng Refresh Token' })
+  @ApiGenericResponse(AuthResponseDto, 'Cấp lại token thành công.', {
+    status: 201,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token không hợp lệ hoặc đã hết hạn.',
+  })
   async refreshTokens(
     @Req() req: any,
     @Res({ passthrough: true }) res: Response,
@@ -163,38 +231,16 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Đăng xuất thành công, đã xóa phiên làm việc!')
+  @ApiOperation({ summary: 'Đăng xuất khỏi hệ thống' })
+  @ApiGenericResponse('Đăng xuất thành công.')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies['refresh_token'];
 
     await this.authService.handleLogout(refreshToken);
 
     clearRefreshTokenCookie(res);
-  }
-
-  @Post()
-  create(@Body() createAuthDto: RegisterDto) {
-    return this.authService.create(createAuthDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.authService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.authService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAuthDto: UpdateAuthDto) {
-    return this.authService.update(+id, updateAuthDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.authService.remove(+id);
   }
 }

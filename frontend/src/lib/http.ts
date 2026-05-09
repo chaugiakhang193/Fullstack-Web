@@ -77,8 +77,23 @@ const request = async <Response>(
     credentials: "include",
   });
 
-  // REFRESH TOKEN TỰ ĐỘNG (Lỗi 401)
-  if (res.status === 401 && isClient() && !url.includes("/auth/refresh")) {
+  // Các endpoint thuộc luồng xác thực PUBLIC - KHÔNG cần auto-refresh khi gặp 401
+  // (các endpoint này chưa/không yêu cầu đăng nhập nên không có token để refresh)
+  const AUTH_PUBLIC_ENDPOINTS = [
+    "/auth/login",
+    "/auth/register",
+    "/auth/verify-email",
+    "/auth/resend-verification",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/auth/refresh",
+  ];
+  const isAuthPublicEndpoint = AUTH_PUBLIC_ENDPOINTS.some((endpoint) =>
+    url.startsWith(endpoint),
+  );
+
+  // REFRESH TOKEN TỰ ĐỘNG (Lỗi 401) - Chỉ áp dụng cho các API cần xác thực
+  if (res.status === 401 && isClient() && !isAuthPublicEndpoint) {
     if (!isRefreshing) {
       isRefreshing = true;
       // Trình duyệt tự mang HttpOnly Cookie (RefreshToken) đi xin token mới
@@ -132,7 +147,7 @@ const request = async <Response>(
     }
   }
 
-  // I  nterceptor frontend, kiểm tra payload trả về và các dạng parse Json
+  // Interceptor frontend, kiểm tra payload trả về và các dạng parse Json
   const payload: Response = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -141,9 +156,11 @@ const request = async <Response>(
       throw new EntityError({ status: res.status as 422 | 400, payload });
     }
     if (res.status === 401) {
-      if (url === "/auth/login" || url === "/auth/refresh") {
+      // Auth public endpoints (login, register, v.v.) -> Trả nguyên message gốc từ backend
+      if (isAuthPublicEndpoint) {
         throw new HttpError({ status: 401, payload });
       }
+      // Các API khác bị 401 -> thông báo phiên hết hạn
       throw new HttpError({
         status: 401,
         payload: { message: "Phiên đăng nhập đã hết hạn" },

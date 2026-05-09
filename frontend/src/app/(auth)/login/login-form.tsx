@@ -124,12 +124,12 @@ export function LoginForm({
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor="username" className="text-sm">
-                      Tên đăng nhập
+                      Email hoặc Tên đăng nhập
                     </FieldLabel>
                     <Input
                       {...field}
                       id="username"
-                      placeholder="Nhập tên đăng nhập"
+                      placeholder="Nhập email hoặc tên đăng nhập"
                       disabled={isLoading}
                     />
                     {fieldState.invalid && (
@@ -144,9 +144,17 @@ export function LoginForm({
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="password" className="text-sm">
-                      Mật khẩu
-                    </FieldLabel>
+                    <div className="flex items-center justify-between">
+                      <FieldLabel htmlFor="password" className="text-sm">
+                        Mật khẩu
+                      </FieldLabel>
+                      <a
+                        href="/forgot-password"
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Quên mật khẩu?
+                      </a>
+                    </div>
                     <Input
                       {...field}
                       id="password"

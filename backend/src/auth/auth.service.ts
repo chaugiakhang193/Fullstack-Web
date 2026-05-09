@@ -28,7 +28,11 @@ import { User } from '@/modules/users/entities/user.entity';
 import { compareHashedDataHelper, hashDataHelper } from '@/helpers/ultis';
 import ms from 'ms';
 import { v4 as uuidv4 } from 'uuid';
-import { VerificationTokenType, AccountStatus } from '@/modules/enums';
+import {
+  VerificationTokenType,
+  AccountStatus,
+  UserRole,
+} from '@/modules/enums';
 
 //JWT
 import { JwtService } from '@nestjs/jwt';
@@ -152,19 +156,42 @@ export class AuthService {
 
   // được gọi trong LocalStrategy để xác thực tài khoản khi đăng nhập
   async validateUser(username: string, password: string): Promise<any> {
-    const existingUser = await this.usersService.findByUsername(username);
+    let isLoginByEmail = false;
+    let user = await this.usersService.findByUsername(username);
 
-    const isValidPassword =
-      existingUser &&
-      (await compareHashedDataHelper(password, existingUser.password));
+    // Nếu không tìm thấy bằng username, thử tìm bằng email
+    if (!user) {
+      user = await this.usersService.findByEmail(username);
+      isLoginByEmail = true;
+    }
+
+    // Nếu không có tài khoản nào khớp
+    if (!user) {
+      throw new UnauthorizedException(
+        'Tài khoản hoặc mật khẩu của bạn không đúng',
+      );
+    }
+
+    // Kiểm tra mật khẩu
+    const isValidPassword = await compareHashedDataHelper(
+      password,
+      user.password,
+    );
 
     if (!isValidPassword) {
-      return null;
-      /* throw new BadRequestException(
-        'Tài khoản hoặc mật khẩu của bạn không đúng',
-      ); */
+      return null; // LocalStrategy sẽ tự động ném ra lỗi UnauthorizedException
     }
-    const { password: _, ...userWithoutPassword } = existingUser;
+
+    // Nếu mật khẩu đúng nhưng tài khoản chưa xác thực email, và người dùng đang cố đăng nhập bằng email -> chặn lại
+    if (isLoginByEmail && user.status === AccountStatus.PENDING_VERIFICATION) {
+      await this.generateAndSendVerificationEmail(user);
+      throw new UnauthorizedException(
+        'Tài khoản chưa được xác thực. Vui lòng kiểm tra email của bạn để kích hoạt.',
+      );
+    }
+
+    // Trả về user (đã loại bỏ password)
+    const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
@@ -273,9 +300,12 @@ export class AuthService {
       user.password = hashedNewPassword;
       user.password_changed_at = new Date();
 
-      // Auto-active cho Customer đang bị pending
-      // (Bảo vệ an toàn: KHÔNG áp dụng cho Seller đang chờ duyệt)
-      if (user.role === 'customer' && user.status === 'pending_approval') {
+      // Auto-active cho CUSTOMER đang bị pending xác thực email
+      // (Bảo vệ an toàn: KHÔNG áp dụng cho SELLER đang chờ duyệt - PENDING_APPROVAL)
+      if (
+        user.role === UserRole.CUSTOMER &&
+        user.status === AccountStatus.PENDING_VERIFICATION
+      ) {
         user.status = AccountStatus.ACTIVE;
       }
 

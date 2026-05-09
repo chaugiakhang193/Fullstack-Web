@@ -18,8 +18,21 @@ export const UserSchema = z.object({
 // Đăng nhập (login)
 export const LoginBody = z
   .object({
-    username: z.string().min(1, "Tên đăng nhập phải có ít nhất 3 ký tự."),
-    password: z.string().min(1, "Vui lòng nhập mật khẩu."),
+    username: z
+      .string()
+      .min(3, "Vui lòng nhập ít nhất 3 ký tự.")
+      .max(32, "Tên đăng nhập tối đa 32 ký tự.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Email hoặc Tên đăng nhập không được chứa khoảng trắng.",
+      ),
+    password: z
+      .string()
+      .min(1, "Vui lòng nhập mật khẩu.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Mật khẩu không được chứa khoảng trắng.",
+      ),
   })
   .strict();
 
@@ -33,17 +46,29 @@ export const RegisterBody = z
       .regex(
         /.*[a-zA-Z].*/,
         "Tên đăng nhập không hợp lệ. Phải chứa ít nhất một chữ cái, không được để toàn số.",
+      )
+      .refine(
+        (val) => !val.includes(" "),
+        "Tên đăng nhập không được chứa khoảng trắng.",
       ),
     email: z
       .string()
       .min(1, "Vui lòng nhập email.")
-      .email("Email không đúng định dạng."),
+      .email("Email không đúng định dạng.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Email không được chứa khoảng trắng.",
+      ),
     password: z
       .string()
       .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
       .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
       .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
-      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
+      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Mật khẩu không được chứa khoảng trắng.",
+      ),
     confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu."),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -56,7 +81,8 @@ export const ForgotPasswordBody = z.object({
   email: z
     .string()
     .min(1, "Vui lòng nhập email.")
-    .email("Email không đúng định dạng."),
+    .email("Email không đúng định dạng.")
+    .refine((val) => !val.includes(" "), "Email không được chứa khoảng trắng."),
 });
 
 // Đặt lại mật khẩu (reset-password)
@@ -68,7 +94,11 @@ export const ResetPasswordBody = z
       .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
       .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
       .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
-      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
+      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Mật khẩu không được chứa khoảng trắng.",
+      ),
     confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu."),
   })
   .refine((data) => data.new_password === data.confirmPassword, {
@@ -79,13 +109,23 @@ export const ResetPasswordBody = z
 // Đổi mật khẩu (change-password)
 export const ChangePasswordBody = z
   .object({
-    old_password: z.string().min(1, "Vui lòng nhập mật khẩu cũ"),
+    old_password: z
+      .string()
+      .min(1, "Vui lòng nhập mật khẩu cũ")
+      .refine(
+        (val) => !val.includes(" "),
+        "Mật khẩu không được chứa khoảng trắng.",
+      ),
     new_password: z
       .string()
       .min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
       .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất 1 chữ hoa.")
       .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất 1 chữ thường.")
-      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số."),
+      .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất 1 chữ số.")
+      .refine(
+        (val) => !val.includes(" "),
+        "Mật khẩu không được chứa khoảng trắng.",
+      ),
     confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu mới."),
   })
   .refine((data) => data.new_password === data.confirmPassword, {
@@ -98,7 +138,8 @@ export const ResendVerificationBody = z.object({
   email: z
     .string()
     .min(1, "Vui lòng nhập email.")
-    .email("Email không đúng định dạng."),
+    .email("Email không đúng định dạng.")
+    .refine((val) => !val.includes(" "), "Email không được chứa khoảng trắng."),
 });
 
 // Xác thực Email (verify-email)

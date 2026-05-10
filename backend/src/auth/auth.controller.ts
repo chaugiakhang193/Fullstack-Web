@@ -81,7 +81,7 @@ export class AuthController {
   @Public()
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
   @ResponseMessage(
     'Mã kích hoạt mới đã được gửi. Vui lòng kiểm tra email của bạn.',
   )
@@ -98,7 +98,7 @@ export class AuthController {
   @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ResponseMessage(
     'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.',
   )
@@ -180,7 +180,7 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
   @ResponseMessage(
     'Yêu cầu thành công. Vui lòng kiểm tra hộp thư email của bạn.',
   )

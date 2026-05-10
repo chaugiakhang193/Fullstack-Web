@@ -81,7 +81,7 @@ export function RegisterForm({
       toast.success("Tuyệt vời!", {
         description: res.message || "Bạn đã tạo tài khoản thành công.",
       });
-      router.push("/login");
+      router.push("/verify-email");
     } catch (error) {
       const httpError = error as { payload?: { message?: string } };
       toast.error("Đăng ký thất bại", {

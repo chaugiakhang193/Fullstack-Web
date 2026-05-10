@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start"
+    "build": "next build",
+    "start": "next start",
+    "gen-api": "openapi-typescript http://localhost:8080/api/docs-json -o ./src/lib/api/api-schema.d.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -15,6 +16,7 @@
     "lucide-react": "^1.11.0",
     "next": "15.5.15",
     "next-themes": "^0.4.6",
+    "openapi-fetch": "^0.17.0",
     "postcss": "^8.5.12",
     "react": "19.1.0",
     "react-dom": "19.1.0",

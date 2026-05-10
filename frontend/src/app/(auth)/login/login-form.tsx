@@ -102,6 +102,10 @@ export function LoginForm({
           httpError.payload?.message ||
           "Thông tin không hợp lệ. Vui lòng thử lại.",
       });
+
+      if (httpError.payload?.message?.includes("chưa được xác thực")) {
+        router.push("/verify-email");
+      }
       setIsLoading(false);
     }
   }

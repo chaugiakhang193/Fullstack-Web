@@ -6,9 +6,12 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  ManyToMany,
+  JoinTable,
 } from 'typeorm';
 import { AccountStatus } from '@/modules/enums';
 import { User } from '@/modules/users/entities/user.entity';
+import { Category } from '@/modules/products/entities/category.entity';
 
 @Entity()
 export class Shop {
@@ -43,6 +46,14 @@ export class Shop {
     default: AccountStatus.PENDING_APPROVAL,
   })
   status: AccountStatus;
+
+  @ManyToMany(() => Category, (category) => category.shops)
+  @JoinTable({
+    name: 'shop_categories',
+    joinColumn: { name: 'shop_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'category_id', referencedColumnName: 'id' },
+  })
+  categories: Category[];
 
   @CreateDateColumn()
   created_at: Date;

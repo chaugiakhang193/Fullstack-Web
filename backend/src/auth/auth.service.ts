@@ -62,6 +62,14 @@ export class AuthService {
     await this.generateAndSendVerificationEmail(newUser);
   }
 
+  //[POST] /auth/seller/register
+  async registerSeller(registerDto: RegisterDto) {
+    //tạo mới người dùng với role SELLER
+    const newUser = await this.usersService.createSeller(registerDto);
+
+    await this.generateAndSendVerificationEmail(newUser);
+  }
+
   // [POST] auth/resend-verification
   async resendVerificationEmail(resendDto: ResendVerificationEmailDto) {
     const { email } = resendDto;
@@ -124,8 +132,12 @@ export class AuthService {
         );
       }
 
-      // nhật trạng thái User thành 'active'
-      user.status = AccountStatus.ACTIVE;
+      // nhật trạng thái User thành 'active' đối với Customer, hoặc 'pending_approval' đối với Seller
+      if (user.role === UserRole.SELLER) {
+        user.status = AccountStatus.PENDING_APPROVAL;
+      } else {
+        user.status = AccountStatus.ACTIVE;
+      }
       await queryRunner.manager.save(User, user); // Lệnh UPDATE
 
       // Xóa Verification Token đã sử dụng

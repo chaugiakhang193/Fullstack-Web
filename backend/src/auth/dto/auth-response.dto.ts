@@ -24,3 +24,24 @@ export class AuthResponseDto {
   })
   user: UserResponseDto;
 }
+
+export class UnverifiedAccountResponseDto {
+  @ApiProperty({
+    example: 401,
+    description: 'Mã trạng thái HTTP',
+  })
+  statusCode: number;
+
+  @ApiProperty({
+    example:
+      'Tài khoản chưa được xác thực. Vui lòng kiểm tra email của bạn để kích hoạt.',
+    description: 'Thông báo lỗi chi tiết',
+  })
+  message: string;
+
+  @ApiProperty({
+    example: 'Unauthorized',
+    description: 'Loại lỗi xác thực',
+  })
+  error: string;
+}

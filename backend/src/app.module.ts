@@ -41,6 +41,7 @@ import { Notification } from '@/modules/engagements/entities/notification.entity
 //Global Guard
 import { APP_GUARD } from '@nestjs/core';
 import { AccessTokenGuard } from './auth/guard/jwt-access-auth.guard';
+import { RolesGuard } from './auth/guard/roles.guard';
 
 //rate limit
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -114,6 +115,10 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.ad
     {
       provide: APP_GUARD,
       useClass: AccessTokenGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
     {
       provide: APP_GUARD,

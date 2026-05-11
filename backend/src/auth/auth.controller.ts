@@ -36,7 +36,10 @@ import { ResendVerificationEmailDto } from '@/auth/dto/resend-verification-email
 import { ChangePasswordDto } from '@/auth/dto/change-password.dto';
 import { ForgotPasswordDto } from '@/auth/dto/forgot-password.dto';
 import { ResetPasswordDto } from '@/auth/dto/reset-password.dto';
-import { AuthResponseDto } from '@/auth/dto/auth-response.dto';
+import {
+  AuthResponseDto,
+  UnverifiedAccountResponseDto,
+} from '@/auth/dto/auth-response.dto';
 
 import { Public, ResponseMessage } from '@/decorator/customize';
 
@@ -76,6 +79,22 @@ export class AuthController {
   })
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Public()
+  @Post('seller/register')
+  @Throttle({ default: { limit: 1, ttl: 60000 } })
+  @ResponseMessage('Đăng ký tài khoản người bán thành công')
+  @ApiOperation({ summary: 'Đăng ký tài khoản người bán mới' })
+  @ApiGenericResponse('Đăng ký thành công, vui lòng kiểm tra email.', {
+    status: 201,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc tài khoản đã tồn tại.',
+  })
+  registerSeller(@Body() registerDto: RegisterDto) {
+    return this.authService.registerSeller(registerDto);
   }
 
   @Public()
@@ -133,6 +152,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ResponseMessage('Đăng nhập thành công')
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
@@ -140,9 +160,16 @@ export class AuthController {
   @ApiGenericResponse(
     AuthResponseDto,
     'Đăng nhập thành công, trả về access_token và set refresh_token vào cookie.',
-    { status: 201 },
+    { status: 200 },
   )
-  @ApiResponse({ status: 401, description: 'Sai tài khoản hoặc mật khẩu.' })
+  @ApiResponse({
+    status: 401,
+    description:
+      'Lỗi xác thực: \n' +
+      '- Sai tài khoản hoặc mật khẩu. \n' +
+      '- Tài khoản chưa được xác thực (nếu đăng nhập bằng email): Hệ thống sẽ tự động gửi email chứa token xác thực và yêu cầu frontend redirect người dùng đến trang verify-email.',
+    type: UnverifiedAccountResponseDto,
+  })
   async login(@Req() req, @Res({ passthrough: true }) res: Response) {
     //nếu đã login sẵn từ trước thì sẽ xóa session hiện tại tạo session mới tránh rác database
     const oldRefreshToken = req.cookies['refresh_token'];
@@ -207,9 +234,10 @@ export class AuthController {
   @Public()
   @UseGuards(RefreshTokenGuard)
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cấp lại Access Token mới bằng Refresh Token' })
   @ApiGenericResponse(AuthResponseDto, 'Cấp lại token thành công.', {
-    status: 201,
+    status: 200,
   })
   @ApiResponse({
     status: 401,

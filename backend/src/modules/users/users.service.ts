@@ -13,7 +13,7 @@ import {
   compareHashedDataHelper,
   isDataExist,
 } from '@/helpers/ultis';
-
+import { UserRole, AccountStatus } from '@/modules/enums';
 @Injectable()
 export class UsersService {
   constructor(
@@ -53,6 +53,34 @@ export class UsersService {
       username: username,
       email: email,
       password: hashedPassword,
+    });
+    return this.usersRepository.save(newUser);
+  }
+
+  async createSeller(registerDto: RegisterDto) {
+    const { username, password, email } = registerDto;
+
+    const isEmailExist = await isDataExist(this.usersRepository, { email });
+    if (isEmailExist) {
+      throw new BadRequestException(
+        'Email này đã được dùng để đăng ký tài khoản khác',
+      );
+    }
+
+    const isUsernameExist = await isDataExist(this.usersRepository, {
+      username,
+    });
+    if (isUsernameExist) {
+      throw new BadRequestException('Tên người dùng này đã được sử dụng');
+    }
+
+    const hashedPassword = await hashDataHelper(password);
+
+    const newUser = this.usersRepository.create({
+      username: username,
+      email: email,
+      password: hashedPassword,
+      role: UserRole.SELLER,
     });
     return this.usersRepository.save(newUser);
   }

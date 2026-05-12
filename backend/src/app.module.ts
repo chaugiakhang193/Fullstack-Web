@@ -17,6 +17,8 @@ import { PromotionsModule } from '@/modules/promotions/promotions.module';
 import { PaymentsModule } from '@/modules/payments/payments.module';
 import { EngagementsModule } from '@/modules/engagements/engagements.module';
 import { MailModule } from '@/modules/mail/mail.module';
+import { CloudinaryModule } from '@/modules/cloudinary/cloudinary.module';
+
 
 //entities
 import { User } from '@/modules/users/entities/user.entity';
@@ -37,6 +39,7 @@ import { UserCoupon } from '@/modules/promotions/entities/user-coupon.entity';
 import { Payment } from '@/modules/payments/entities/payment.entity';
 import { Review } from '@/modules/engagements/entities/review.entity';
 import { Notification } from '@/modules/engagements/entities/notification.entity';
+import { MediaAsset } from '@/modules/cloudinary/entities/media-asset.entity';
 
 //Global Guard
 import { APP_GUARD } from '@nestjs/core';
@@ -71,6 +74,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.ad
       isGlobal: true,
       envFilePath: '.env',
     }),
+    CloudinaryModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -100,6 +104,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.ad
           Payment,
           Review,
           Notification,
+          MediaAsset,
         ],
         synchronize: true,
       }),

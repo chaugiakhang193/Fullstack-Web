@@ -5,6 +5,7 @@ import {
   IsArray,
   IsUUID,
   MinLength,
+  ArrayNotEmpty,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -38,18 +39,20 @@ export class CreateShopDto {
   @ApiProperty({
     example: 'https://cloudinary.com/logo.png',
     description: 'URL ảnh logo của shop',
+    required: false,
   })
-  @IsNotEmpty({ message: 'Logo shop không được để trống' })
+  @IsOptional()
   @IsString({ message: 'Logo URL phải là chuỗi ký tự' })
-  logo_url: string;
+  logo_url?: string;
 
   @ApiProperty({
     example: 'https://cloudinary.com/banner.png',
     description: 'URL ảnh banner của shop',
+    required: false,
   })
-  @IsNotEmpty({ message: 'Banner shop không được để trống' })
+  @IsOptional()
   @IsString({ message: 'Banner URL phải là chuỗi ký tự' })
-  banner_url: string;
+  banner_url?: string;
 
   @ApiProperty({
     example: 'VCB - 123456789 - NGUYEN VAN A',

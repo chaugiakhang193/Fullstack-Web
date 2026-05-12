@@ -1,3 +1,4 @@
+import 'multer';
 import {
   BadRequestException,
   Injectable,
@@ -5,11 +6,14 @@ import {
 } from '@nestjs/common';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Shop } from './entities/shop.entity';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { Category } from '../products/entities/category.entity';
-import { AccountStatus } from '../enums';
+import { User } from '../users/entities/user.entity';
+import { AccountStatus, AssetType } from '../enums';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { UsersService } from '@/modules/users/users.service';
 
 @Injectable()
 export class ShopsService {
@@ -18,9 +22,28 @@ export class ShopsService {
     private readonly shopsRepository: Repository<Shop>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly userService: UsersService,
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
-  async setupInitialShop(userId: string, createShopDto: CreateShopDto) {
+  async setupInitialShop(
+    userId: string,
+    createShopDto: CreateShopDto,
+    files?: {
+      logo?: Express.Multer.File[];
+      banner?: Express.Multer.File[];
+      gallery?: Express.Multer.File[];
+    },
+  ) {
+    const sellCreateShop = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+    if (!sellCreateShop) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
     const { categoryIds, ...shopInfo } = createShopDto;
 
     // Kiểm tra xem seller này đã có Shop chưa
@@ -33,42 +56,369 @@ export class ShopsService {
     }
 
     // Kiểm tra danh mục có tồn tại không
-    const categories = await this.categoriesRepository.find({
-      where: { id: In(categoryIds) },
-    });
-
-    if (categories.length === 0) {
-      throw new BadRequestException('Danh mục không hợp lệ');
+    let categories: Category[] = [];
+    // Convert categoryIds to array if it's sent as a string (from multipart/form-data)
+    let parsedCategoryIds = categoryIds;
+    if (typeof categoryIds === 'string') {
+      try {
+        parsedCategoryIds = JSON.parse(categoryIds);
+      } catch (e) {
+        parsedCategoryIds = [categoryIds];
+      }
     }
 
-    // Tạo mới Shop
+    if (parsedCategoryIds && parsedCategoryIds.length > 0) {
+      categories = await this.categoriesRepository.find({
+        where: { id: In(parsedCategoryIds) },
+        relations: ['parent'],
+      });
+
+      if (categories.length === 0) {
+        throw new BadRequestException('Danh mục không hợp lệ');
+      }
+
+      const nonRootCategories = categories.filter((c) => c.parent !== null);
+      if (nonRootCategories.length > 0) {
+        throw new BadRequestException(
+          'Chỉ được phép chọn danh mục gốc (không có danh mục cha)',
+        );
+      }
+
+      if (categories.length !== parsedCategoryIds.length) {
+        throw new BadRequestException('Một hoặc nhiều danh mục không tồn tại');
+      }
+    }
+
+    // Kiểm tra logo và banner
+    if (!files?.logo?.[0] || !files?.banner?.[0]) {
+      throw new BadRequestException('Bắt buộc phải upload logo và banner');
+    }
+
+    if (!files?.gallery || files.gallery.length === 0) {
+      throw new BadRequestException(
+        'Vui lòng upload ít nhất 1 ảnh liên quan cho gian hàng',
+      );
+    }
+
+    if (files.gallery.length > 3) {
+      throw new BadRequestException('Chỉ được upload tối đa 3 ảnh liên quan');
+    }
+
+    // Upload logo
+    const logoResult = await this.cloudinaryService.uploadFile(
+      files.logo[0],
+      'shop_logos',
+      userId,
+      AssetType.SHOP_LOGO,
+    );
+
+    // Upload banner
+    const bannerResult = await this.cloudinaryService.uploadFile(
+      files.banner[0],
+      'shop_banners',
+      userId,
+      AssetType.SHOP_BANNER,
+    );
+
+    // Tạo mới Shop (chưa gán gallery)
     const newShop = this.shopsRepository.create({
       ...shopInfo,
-      seller: { id: userId } as any,
+      logo_url: logoResult.url,
+      banner_url: bannerResult.url,
+      seller: sellCreateShop,
       categories: categories,
     });
 
-    return await this.shopsRepository.save(newShop);
+    const savedShop = await this.shopsRepository.save(newShop);
+
+    // Gán asset shop_id cho logo và banner
+    await this.cloudinaryService.updateAssetShopId(logoResult.id, savedShop.id);
+    await this.cloudinaryService.updateAssetShopId(
+      bannerResult.id,
+      savedShop.id,
+    );
+
+    // Upload gallery
+    if (files?.gallery && files.gallery.length > 0) {
+      await this.cloudinaryService.uploadMultipleFiles(
+        files.gallery as Express.Multer.File[],
+        'shop_galleries',
+        userId,
+        AssetType.SHOP_GALLERY,
+        savedShop.id,
+      );
+    }
+
+    return await this.findOneByShopId(savedShop.id);
   }
 
   findAll() {
     return this.shopsRepository.find({ relations: ['seller', 'categories'] });
   }
 
-  async findOne(id: string) {
+  async findOneByShopId(id: string, isPublic?: boolean) {
+    const whereCondition: any = { id };
+
+    if (isPublic) {
+      whereCondition.status = AccountStatus.ACTIVE;
+    }
+
     const shop = await this.shopsRepository.findOne({
-      where: { id },
-      relations: ['seller', 'categories'],
+      where: whereCondition,
+      relations: ['seller', 'categories', 'gallery'],
     });
     if (!shop) throw new NotFoundException('Không tìm thấy gian hàng');
     return shop;
   }
 
-  update(id: number, updateShopDto: UpdateShopDto) {
-    return `This action updates a #${id} shop`;
+  async findOneByUserId(userId: string) {
+    const shop = await this.shopsRepository.findOne({
+      where: { seller: { id: userId } },
+      relations: ['categories', 'gallery'],
+    });
+    if (!shop) throw new NotFoundException('Không tìm thấy gian hàng của bạn');
+    return shop;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} shop`;
+  async updateMyShop(userId: string, updateShopDto: UpdateShopDto) {
+    const shop = await this.findOneByUserId(userId);
+    if (!updateShopDto || Object.keys(updateShopDto).length === 0) {
+      throw new BadRequestException('Dữ liệu cập nhật không được để trống');
+    }
+    const { categoryIds, ...shopInfo } = updateShopDto;
+
+    Object.assign(shop, shopInfo);
+
+    if (categoryIds) {
+      let parsedCategoryIds = categoryIds;
+      if (typeof categoryIds === 'string') {
+        try {
+          parsedCategoryIds = JSON.parse(categoryIds);
+        } catch (e) {
+          parsedCategoryIds = [categoryIds];
+        }
+      }
+
+      if (parsedCategoryIds && parsedCategoryIds.length > 0) {
+        const categories = await this.categoriesRepository.find({
+          where: { id: In(parsedCategoryIds) },
+          relations: ['parent'],
+        });
+
+        if (categories.length === 0) {
+          throw new BadRequestException('Danh mục không hợp lệ');
+        }
+
+        const nonRootCategories = categories.filter((c) => c.parent !== null);
+        if (nonRootCategories.length > 0) {
+          throw new BadRequestException(
+            'Chỉ được phép chọn danh mục gốc (không có danh mục cha)',
+          );
+        }
+
+        if (categories.length !== parsedCategoryIds.length) {
+          throw new BadRequestException(
+            'Một hoặc nhiều danh mục không tồn tại',
+          );
+        }
+        shop.categories = categories;
+      }
+    }
+
+    return await this.shopsRepository.save(shop);
+  }
+
+  async updateLogo(userId: string, file: Express.Multer.File) {
+    const shop = await this.findOneByUserId(userId);
+
+    if (shop.logo_url) {
+      const oldAsset = await this.cloudinaryService.findAssetByUrl(
+        shop.logo_url,
+      );
+      if (oldAsset) {
+        await this.cloudinaryService.deleteAsset(oldAsset.id, userId);
+      }
+    }
+
+    const result = await this.cloudinaryService.uploadFile(
+      file,
+      'shop_logos',
+      userId,
+      AssetType.SHOP_LOGO,
+      shop.id,
+    );
+    await this.shopsRepository.update(shop.id, { logo_url: result.url });
+    return await this.findOneByUserId(userId);
+  }
+
+  async updateBanner(userId: string, file: Express.Multer.File) {
+    const shop = await this.findOneByUserId(userId);
+
+    if (shop.banner_url) {
+      const oldAsset = await this.cloudinaryService.findAssetByUrl(
+        shop.banner_url,
+      );
+      if (oldAsset) {
+        await this.cloudinaryService.deleteAsset(oldAsset.id, userId);
+      }
+    }
+
+    const result = await this.cloudinaryService.uploadFile(
+      file,
+      'shop_banners',
+      userId,
+      AssetType.SHOP_BANNER,
+      shop.id,
+    );
+    await this.shopsRepository.update(shop.id, { banner_url: result.url });
+    return await this.findOneByUserId(userId);
+  }
+
+  async addGalleryImages(userId: string, files: Express.Multer.File[]) {
+    const shop = await this.shopsRepository.findOne({
+      where: { seller: { id: userId } },
+      relations: ['gallery'],
+    });
+    if (!shop) throw new NotFoundException('Không tìm thấy gian hàng của bạn');
+
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Vui lòng tải lên ít nhất 1 ảnh');
+    }
+
+    if (shop.gallery.length + files.length > 3) {
+      throw new BadRequestException(
+        `Bạn chỉ được upload tối đa 3 ảnh liên quan. Hiện tại bạn đã có ${shop.gallery.length} ảnh, không thể upload thêm ${files.length} ảnh.`,
+      );
+    }
+
+    await this.cloudinaryService.uploadMultipleFiles(
+      files,
+      'shop_galleries',
+      userId,
+      AssetType.SHOP_GALLERY,
+      shop.id,
+    );
+
+    return await this.shopsRepository.findOne({
+      where: { id: shop.id },
+      relations: ['gallery'],
+    });
+  }
+
+  async removeGalleryImage(userId: string, assetId: string) {
+    const shop = await this.findOneByUserId(userId);
+
+    // Kiểm tra ảnh có tồn tại và thuộc về shop/user này không
+    const asset = await this.cloudinaryService.findAssetById(assetId);
+
+    if (!asset || asset.owner?.id !== userId) {
+      throw new BadRequestException(
+        'Không tìm thấy hình ảnh hoặc bạn không có quyền xóa',
+      );
+    }
+
+    // Kiểm tra type có phải là GALLERY không
+    if (asset.type !== AssetType.SHOP_GALLERY) {
+      throw new BadRequestException(
+        'Bạn chỉ có quyền xóa hình ảnh trong bộ sưu tập (gallery)',
+      );
+    }
+
+    await this.cloudinaryService.deleteAsset(assetId, userId);
+
+    return await this.shopsRepository.findOne({
+      where: { id: shop.id },
+      relations: ['gallery'],
+    });
+  }
+
+  async approveShop(id: string) {
+    // Lấy data trước khi vào transaction để giảm thời gian khóa (lock) Database
+    const shop = await this.findOneByShopId(id);
+
+    // Mở Transaction
+    return await this.dataSource.transaction(async (manager) => {
+      // Cập nhật trạng thái Shop
+      shop.status = AccountStatus.ACTIVE;
+      const updatedShop = await manager.save(Shop, shop);
+
+      // Cập nhật trạng thái User (Seller) sang ACTIVE
+      if (shop.seller) {
+        await manager.update(User, shop.seller.id, {
+          status: AccountStatus.ACTIVE,
+        });
+      }
+
+      // TODO: Gửi email cho seller báo tin vui (Nên dùng Event Emitter bắn sự kiện ra ngoài)
+
+      return updatedShop;
+    });
+  }
+
+  async rejectShop(id: string, reason: string) {
+    if (!reason || reason.trim() === '') {
+      throw new BadRequestException(
+        'Vui lòng cung cấp lý do từ chối gian hàng để báo cho Seller.',
+      );
+    }
+
+    const shop = await this.findOneByShopId(id);
+
+    // Mở Transaction
+    return await this.dataSource.transaction(async (manager) => {
+      // Cập nhật trạng thái Shop
+      shop.status = AccountStatus.REJECTED;
+
+      // Nếu trong Entity Shop bạn có làm thêm cột reject_reason thì gán luôn ở đây:
+      // shop.reject_reason = reason;
+
+      const updatedShop = await manager.save(Shop, shop);
+
+      // Cập nhật trạng thái User
+      if (shop.seller) {
+        await manager.update(User, shop.seller.id, {
+          status: AccountStatus.REJECTED,
+        });
+      }
+
+      // TODO: Gửi email cho seller báo lý do (reason) để họ biết đường sửa
+
+      return updatedShop;
+    });
+  }
+
+  async reApplyShop(userId: string) {
+    const shop = await this.findOneByUserId(userId);
+
+    if (shop.status !== AccountStatus.REJECTED) {
+      throw new BadRequestException(
+        'Gian hàng của bạn không ở trạng thái bị từ chối',
+      );
+    }
+
+    // Bắt đầu Transaction
+    return await this.dataSource.transaction(
+      async (transactionalEntityManager) => {
+        // Cập nhật trạng thái Shop sang PENDING_APPROVAL
+        shop.status = AccountStatus.PENDING_APPROVAL;
+        const updatedShop = await transactionalEntityManager.save(shop);
+
+        //cập nhật trạng thái User (Seller) sang PENDING_APPROVAL
+        if (shop.seller) {
+          await transactionalEntityManager.update(User, shop.seller.id, {
+            status: AccountStatus.PENDING_APPROVAL,
+          });
+        }
+
+        return updatedShop;
+      },
+    );
+  }
+
+  async getPendingShops() {
+    return this.shopsRepository.find({
+      where: { status: AccountStatus.PENDING_APPROVAL },
+      relations: ['seller', 'categories'],
+    });
   }
 }

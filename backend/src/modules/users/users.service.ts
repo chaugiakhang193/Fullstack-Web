@@ -28,7 +28,7 @@ export class UsersService {
     if (user) return true;
     return false;
   }; */
-  async create(registerDto: RegisterDto) {
+  async createCustomer(registerDto: RegisterDto) {
     const { username, password, email } = registerDto;
 
     const isEmailExist = await isDataExist(this.usersRepository, { email });

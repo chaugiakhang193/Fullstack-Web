@@ -10,6 +10,7 @@ export enum AccountStatus {
   ACTIVE = 'active',
   SUSPENDED = 'suspended',
   BANNED = 'banned',
+  REJECTED = 'rejected',
 }
 
 export enum OrderStatus {
@@ -45,4 +46,12 @@ export enum DiscountType {
 export enum VerificationTokenType {
   VERIFY_EMAIL = 'verify_email',
   RESET_PASSWORD = 'reset_password',
+}
+
+export enum AssetType {
+  SHOP_LOGO = 'shop_logo',
+  SHOP_BANNER = 'shop_banner',
+  SHOP_GALLERY = 'shop_gallery',
+  PRODUCT_IMAGE = 'product_image',
+  USER_AVATAR = 'user_avatar',
 }

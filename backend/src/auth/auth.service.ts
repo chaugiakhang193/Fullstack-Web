@@ -56,8 +56,8 @@ export class AuthService {
 
   //[POST] /auth/register
   async register(RegisterDto: RegisterDto) {
-    //tạo mới người dùng
-    const newUser = await this.usersService.create(RegisterDto);
+    //tạo mới người dùng role CUSTOMER mặc định
+    const newUser = await this.usersService.createCustomer(RegisterDto);
 
     await this.generateAndSendVerificationEmail(newUser);
   }

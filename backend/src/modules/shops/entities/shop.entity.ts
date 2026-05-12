@@ -8,10 +8,12 @@ import {
   JoinColumn,
   ManyToMany,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
 import { AccountStatus } from '@/modules/enums';
 import { User } from '@/modules/users/entities/user.entity';
 import { Category } from '@/modules/products/entities/category.entity';
+import { MediaAsset } from '@/modules/cloudinary/entities/media-asset.entity';
 
 @Entity()
 export class Shop {
@@ -54,6 +56,9 @@ export class Shop {
     inverseJoinColumn: { name: 'category_id', referencedColumnName: 'id' },
   })
   categories: Category[];
+
+  @OneToMany(() => MediaAsset, (asset) => asset.shop)
+  gallery: MediaAsset[];
 
   @CreateDateColumn()
   created_at: Date;

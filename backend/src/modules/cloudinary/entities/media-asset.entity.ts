@@ -15,9 +15,11 @@ export class MediaAsset {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  // Lưu id của file trên Cloudinary để dễ dàng quản lý, xóa file khi cần thiết
   @Column()
   public_id: string;
 
+  // Lưu URL của file trên Cloudinary để frontend dễ dàng hiển thị mà không cần phải gọi API backend để lấy URL
   @Column()
   url: string;
 

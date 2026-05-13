@@ -238,7 +238,7 @@ export class AuthService {
       old_password,
       new_password,
     );
-    //sau khi đổi mật khẩu thành công mới chạy xuống xóa các session cũ, xóa hết refreshtoken cũ
+    // Sau khi đổi mật khẩu thành công mới chạy xuống xóa các session cũ, xóa hết refreshtoken cũ
     await this.sessionRepository
       .createQueryBuilder()
       .delete()
@@ -256,10 +256,10 @@ export class AuthService {
       return;
     }
 
-    // 3. Xóa các token reset cũ của user này (nếu có) để tránh rác DB
+    // Xóa các token reset cũ của user này (nếu có) để tránh rác DB
     await this.verificationTokenRepository.delete({ user: { id: user.id } });
 
-    //tạo token xác thực tài khoản và gửi email cho người dùng
+    // Tạo token xác thực tài khoản và gửi email cho người dùng
     const resetToken = uuidv4();
     const tokenExpiration = new Date(Date.now() + 15 * 60 * 1000);
     const newVerificationToken = this.verificationTokenRepository.create({

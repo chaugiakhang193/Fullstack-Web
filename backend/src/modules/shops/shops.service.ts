@@ -2,6 +2,7 @@ import 'multer';
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateShopDto } from './dto/create-shop.dto';
@@ -47,6 +48,7 @@ export class ShopsService {
     const { categoryIds, ...shopInfo } = createShopDto;
 
     // Kiểm tra xem seller này đã có Shop chưa
+    // Vì mỗi tài khoản seller chỉ được phép tạo 1 Shop trên hệ thống
     const existingShop = await this.shopsRepository.findOne({
       where: { seller: { id: userId } },
     });
@@ -65,6 +67,12 @@ export class ShopsService {
       } catch (e) {
         parsedCategoryIds = [categoryIds];
       }
+    }
+
+    //Ép kiểu an toàn phòng trường họp frontend gửi CategoryIds là một chuỗi số
+    //Không xử lý là sập server do lỗi kiểu dữ liệu, ép thành mảng 1 phần tử để xử lý tiếp
+    if (!Array.isArray(parsedCategoryIds)) {
+      parsedCategoryIds = [parsedCategoryIds];
     }
 
     if (parsedCategoryIds && parsedCategoryIds.length > 0) {
@@ -104,52 +112,126 @@ export class ShopsService {
       throw new BadRequestException('Chỉ được upload tối đa 3 ảnh liên quan');
     }
 
-    // Upload logo
-    const logoResult = await this.cloudinaryService.uploadFile(
-      files.logo[0],
-      'shop_logos',
-      userId,
-      AssetType.SHOP_LOGO,
-    );
+    // Danh sách cái Assest ID đã upload thành công
+    const uploadedAssets: { id: string; public_id: string }[] = [];
+    let savedShopId: string | null = null;
 
-    // Upload banner
-    const bannerResult = await this.cloudinaryService.uploadFile(
-      files.banner[0],
-      'shop_banners',
-      userId,
-      AssetType.SHOP_BANNER,
-    );
-
-    // Tạo mới Shop (chưa gán gallery)
-    const newShop = this.shopsRepository.create({
-      ...shopInfo,
-      logo_url: logoResult.url,
-      banner_url: bannerResult.url,
-      seller: sellCreateShop,
-      categories: categories,
-    });
-
-    const savedShop = await this.shopsRepository.save(newShop);
-
-    // Gán asset shop_id cho logo và banner
-    await this.cloudinaryService.updateAssetShopId(logoResult.id, savedShop.id);
-    await this.cloudinaryService.updateAssetShopId(
-      bannerResult.id,
-      savedShop.id,
-    );
-
-    // Upload gallery
-    if (files?.gallery && files.gallery.length > 0) {
-      await this.cloudinaryService.uploadMultipleFiles(
-        files.gallery as Express.Multer.File[],
-        'shop_galleries',
+    try {
+      // Upload logo
+      const logoResult = await this.cloudinaryService.uploadFile(
+        files.logo[0],
+        'shop_logos',
         userId,
-        AssetType.SHOP_GALLERY,
+        AssetType.SHOP_LOGO,
+      );
+      uploadedAssets.push({
+        id: logoResult.id,
+        public_id: logoResult.public_id,
+      });
+
+      // Upload banner
+      const bannerResult = await this.cloudinaryService.uploadFile(
+        files.banner[0],
+        'shop_banners',
+        userId,
+        AssetType.SHOP_BANNER,
+      );
+      uploadedAssets.push({
+        id: bannerResult.id,
+        public_id: bannerResult.public_id,
+      });
+
+      // Tạo mới Shop (chưa gán gallery)
+      const newShop = this.shopsRepository.create({
+        ...shopInfo,
+        logo_url: logoResult.url,
+        banner_url: bannerResult.url,
+        seller: sellCreateShop,
+        categories: categories,
+      });
+
+      const savedShop = await this.shopsRepository.save(newShop);
+      savedShopId = savedShop.id;
+
+      // Gán asset shop_id cho logo và banner
+      await this.cloudinaryService.updateAssetShopId(
+        logoResult.id,
         savedShop.id,
       );
-    }
+      await this.cloudinaryService.updateAssetShopId(
+        bannerResult.id,
+        savedShop.id,
+      );
 
-    return await this.findOneByShopId(savedShop.id);
+      // Upload gallery theo kiểu song song để tối ưu tốc độ, KHÔNG ĐƯỢC UPLOAD
+      // TỪ TỪ vì nếu có 1 tấm bị lỗi thì sẽ không kịp lưu ID của những tấm đã
+      // Upload thành công trước đó vào biến uploadedAssetIds để phục vụ cho việc dọn rác sau này nếu cần thiết
+      if (files?.gallery && files.gallery.length > 0) {
+        // Tạo ra một mảng các tiến trình upload (chưa chạy)
+        const uploadPromises = files.gallery.map(async (file) => {
+          const galleryResult = await this.cloudinaryService.uploadFile(
+            file,
+            'shop_galleries',
+            userId,
+            AssetType.SHOP_GALLERY,
+            savedShop.id,
+          );
+
+          // QUAN TRỌNG: Ảnh nào upload thành công là GHI NỢ NGAY LẬP TỨC
+          uploadedAssets.push({
+            id: galleryResult.id,
+            public_id: galleryResult.public_id,
+          });
+
+          // Cập nhật DB
+          await this.cloudinaryService.updateAssetShopId(
+            galleryResult.id,
+            savedShop.id,
+          );
+        });
+
+        // KÍCH HOẠT CHẠY SONG SONG TẤT CẢ CÁC ẢNH
+        // Dùng allSettled để BẮT BUỘC CHỜ tất cả các file (dù thành công hay thất bại)
+        const results = await Promise.allSettled(uploadPromises);
+
+        // Kiểm tra xem trong lúc upload song song, có tấm nào bị xịt không?
+        const hasError = results.some((result) => result.status === 'rejected');
+        if (hasError) {
+          // Chỉ cần 1 tấm xịt, ta chủ động ném lỗi.
+          // Lúc này code sẽ nhảy xuống cục catch.
+          // Biến uploadedAssetIds đã lưu ID của tất cả những tấm thành công!
+          throw new Error('Có lỗi xảy ra trong quá trình upload ảnh Gallery');
+        }
+      }
+      return await this.findOneByShopId(savedShop.id);
+    } catch (error) {
+      // NẾU CÓ LỖI THÌ BẮT ĐẦU DỌN RÁC
+      // Dựa trên danh sách uploadedAssetIds để xem có file nào được upload trước khi xảy ra lỗi không
+      if (uploadedAssets.length > 0) {
+        Promise.allSettled(
+          uploadedAssets.map((asset) =>
+            this.cloudinaryService.deleteFile(asset.public_id),
+          ),
+        ).catch((cleanupError) => {
+          console.error('Lỗi khi dọn rác Cloudinary:', cleanupError);
+        });
+      }
+      if (savedShopId) {
+        //Nếu lỗi xảy ra sau khi đã tạo được shop thì xóa shop đó đi để tránh dữ liệu rác trong database
+        await this.shopsRepository.delete(savedShopId).catch((dbError) => {
+          console.error(
+            `Không thể xóa shop rác (ID: ${savedShopId}):`,
+            dbError,
+          );
+        });
+      }
+
+      console.error('[setupInitialShop] Lỗi Khởi Tạo Gian Hàng:', error);
+
+      throw new InternalServerErrorException(
+        'Hệ thống gặp sự cố khi tạo gian hàng. Vui lòng thử lại sau!',
+      );
+    }
   }
 
   findAll() {

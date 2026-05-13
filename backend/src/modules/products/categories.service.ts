@@ -126,6 +126,8 @@ export class CategoriesService {
     return await this.categoriesRepository.remove(category);
   }
 
+  // Tạo slug tự động dựa trên name category, sử dụng slutify,
+  // Tốt cho SEO và dễ dàng tạo URL khi truy cập danh mục
   private generateSlug(name: string): string {
     return slugify(name, { lower: true, locale: 'vi' });
   }

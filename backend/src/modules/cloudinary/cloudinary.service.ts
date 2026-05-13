@@ -14,6 +14,7 @@ export class CloudinaryService {
     private readonly mediaAssetRepository: Repository<MediaAsset>,
   ) {}
 
+  //upload một file lên Cloudinary, lưu thông tin file vào DB nếu có ownerId và type, trả về kết quả upload
   async uploadFile(
     file: Express.Multer.File,
     folder: string,
@@ -46,10 +47,11 @@ export class CloudinaryService {
       });
       return await this.mediaAssetRepository.save(newAsset);
     }
-
-    return result; // return Cloudinary result if no DB info provided
+    // Trả về kết quả upload thô nếu không có ownerId và type, để linh hoạt sử dụng cho các mục đích khác nhau mà không nhất thiết phải lưu vào DB.
+    return result;
   }
 
+  //upload nhiều file lên Cloudinary, lưu thông tin file vào DB nếu có ownerId và type, trả về kết quả upload
   async uploadMultipleFiles(
     files: Express.Multer.File[],
     folder: string,
@@ -63,6 +65,7 @@ export class CloudinaryService {
     return Promise.all(uploadPromises);
   }
 
+  // Xóa file trên Cloudinary bằng public_id, trả về kết quả xóa
   async deleteFile(publicId: string): Promise<any> {
     return new Promise((resolve, reject) => {
       cloudinary.uploader.destroy(publicId, (error, result) => {
@@ -72,6 +75,7 @@ export class CloudinaryService {
     });
   }
 
+  // Xóa một asset cả trên Cloudinary và trong DB, chỉ cho phép xóa nếu asset thuộc về ownerId
   async deleteAsset(assetId: string, ownerId: string): Promise<void> {
     const asset = await this.mediaAssetRepository.findOne({
       where: { id: assetId, owner: { id: ownerId } },
@@ -84,6 +88,7 @@ export class CloudinaryService {
     await this.mediaAssetRepository.remove(asset);
   }
 
+  // Tìm một asset theo ID, bao gồm thông tin liên quan đến owner và shop
   async findAssetById(assetId: string): Promise<MediaAsset | null> {
     return await this.mediaAssetRepository.findOne({
       where: { id: assetId },
@@ -91,13 +96,15 @@ export class CloudinaryService {
     });
   }
 
+  // Tìm một asset theo URL, trả về null nếu không tìm thấy hoặc nếu URL không hợp lệ
   async findAssetByUrl(url: string): Promise<MediaAsset | null> {
     if (!url) return null;
     return await this.mediaAssetRepository.findOne({ where: { url } });
+    // Nếu không tìm thấy sẽ trả về null thay vì undefined, giúp tránh lỗi khi truy cập thuộc tính của kết quả trả về.
   }
 
   async updateAssetShopId(assetId: string, shopId: string): Promise<void> {
-    // Sử dụng save với partial object để TypeORM xử lý relation chính xác hơn update()
+    // Sử dụng save với partial object để TypeOM xử lý Rrelation chính xác hơn update()
     await this.mediaAssetRepository.save({
       id: assetId,
       shop: { id: shopId } as any,

@@ -7,7 +7,6 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
   Req,
   UseInterceptors,
   UploadedFile,
@@ -27,6 +26,8 @@ import {
   UploadSingleFileSwaggerDto,
   UploadMultipleFilesSwaggerDto,
 } from './dto/shop-swagger.dto';
+import { ShopResponseDto } from './dto/shop-response.dto';
+
 import {
   ApiBearerAuth,
   ApiBody,
@@ -40,6 +41,7 @@ import {
 import { Roles } from '@/decorator/roles.decorator';
 import { UserRole } from '../enums';
 import { ResponseMessage, Public } from '@/decorator/customize';
+import { ApiGenericResponse } from '@/decorator/api-response.decorator';
 
 @ApiTags('shop')
 @ApiBearerAuth('access-token')
@@ -69,9 +71,8 @@ export class ShopsController {
   @ApiBody({
     type: SetupShopSwaggerDto,
   })
-  @ApiResponse({
+  @ApiGenericResponse(ShopResponseDto, 'Khởi tạo thành công, đang chờ duyệt.', {
     status: 201,
-    description: 'Khởi tạo thành công, đang chờ duyệt.',
   })
   @ApiResponse({
     status: 400,
@@ -102,6 +103,7 @@ export class ShopsController {
   @Roles(UserRole.SELLER)
   @ResponseMessage('Lấy chi tiết gian hàng thành công.')
   @ApiOperation({ summary: 'Seller lấy chi tiết gian hàng của mình' })
+  @ApiGenericResponse(ShopResponseDto, 'Lấy chi tiết gian hàng thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   getMyShop(@Req() req) {
@@ -114,8 +116,10 @@ export class ShopsController {
   @ResponseMessage('Lấy chi tiết gian hàng thành công.')
   @ApiOperation({
     summary:
-      'Lấy chi tiết một gian hàng cho người dùng guest(chưa đăng nhặp hoặc customer)',
+      'Lấy chi tiết một gian hàng cho người dùng guest (chưa đăng nhập hoặc customer)',
   })
+  @ApiGenericResponse(ShopResponseDto, 'Lấy chi tiết gian hàng thành công.')
+  @ApiResponse({ status: 404, description: 'Không tìm thấy gian hàng.' })
   findOne(@Param('id') id: string) {
     return this.shopsService.findOneByShopId(id, true);
   }
@@ -135,6 +139,7 @@ export class ShopsController {
   @ApiBody({
     type: UpdateShopSwaggerDto,
   })
+  @ApiGenericResponse(ShopResponseDto, 'Cập nhật thông tin thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   async updateMyShop(
@@ -148,27 +153,21 @@ export class ShopsController {
     },
   ) {
     const userId = req.user.sub;
-    // Update các trường thông tin gian hàng nếu có thay đổi
-    // Sau đó xử lý các file media nếu có (logo, banner, gallery)
     if (updateShopDto && Object.keys(updateShopDto).length > 0) {
       await this.shopsService.updateMyShop(userId, updateShopDto);
     }
 
-    // Upload file logo mới (optional)
     if (files?.logo?.[0]) {
       await this.shopsService.updateLogo(userId, files.logo[0]);
     }
 
-    // Upload file banner mới (optional)
     if (files?.banner?.[0]) {
       await this.shopsService.updateBanner(userId, files.banner[0]);
     }
 
-    // Upload thêm các file gallery mới (optional, có thể thêm tối đa 3 ảnh vào gallery)
     if (files?.gallery && files.gallery.length > 0) {
       await this.shopsService.addGalleryImages(userId, files.gallery);
     }
-    // Tìm gian hàng dựa trên userId để trả về thông tin đã cập nhật mới nhất
     return await this.shopsService.findOneByUserId(userId);
   }
 
@@ -179,6 +178,7 @@ export class ShopsController {
   @ApiOperation({ summary: 'Seller cập nhật logo gian hàng' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadSingleFileSwaggerDto })
+  @ApiGenericResponse(ShopResponseDto, 'Cập nhật logo thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   uploadLogo(@Req() req, @UploadedFile() file: Express.Multer.File) {
@@ -193,6 +193,7 @@ export class ShopsController {
   @ApiOperation({ summary: 'Seller cập nhật banner gian hàng' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadSingleFileSwaggerDto })
+  @ApiGenericResponse(ShopResponseDto, 'Cập nhật banner thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   uploadBanner(@Req() req, @UploadedFile() file: Express.Multer.File) {
@@ -204,6 +205,7 @@ export class ShopsController {
   @Roles(UserRole.SELLER)
   @ResponseMessage('Đã nộp lại đơn đăng ký gian hàng thành công.')
   @ApiOperation({ summary: 'Seller nộp lại đơn đăng ký sau khi bị từ chối' })
+  @ApiGenericResponse(ShopResponseDto, 'Nộp lại đơn đăng ký thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   reApplyShop(@Req() req) {
@@ -218,6 +220,7 @@ export class ShopsController {
   @ApiOperation({ summary: 'Seller thêm tối đa 3 ảnh vào gallery' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadMultipleFilesSwaggerDto })
+  @ApiGenericResponse(ShopResponseDto, 'Thêm ảnh thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   addGalleryImages(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
@@ -229,6 +232,7 @@ export class ShopsController {
   @Roles(UserRole.SELLER)
   @ResponseMessage('Xóa ảnh liên quan thành công.')
   @ApiOperation({ summary: 'Seller xóa 1 ảnh khỏi gallery' })
+  @ApiGenericResponse(ShopResponseDto, 'Xóa ảnh thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Chỉ dành cho SELLER.' })
   removeGalleryImage(@Req() req, @Param('assetId') assetId: string) {
@@ -240,6 +244,9 @@ export class ShopsController {
   @Roles(UserRole.ADMIN)
   @Get('admin/shops-list')
   @ApiOperation({ summary: 'Lấy danh sách tất cả gian hàng' })
+  @ApiGenericResponse(ShopResponseDto, 'Lấy danh sách thành công.', {
+    isArray: true,
+  })
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Yêu cầu quyền ADMIN.' })
   findAll() {
@@ -249,6 +256,9 @@ export class ShopsController {
   @Get('admin/pending')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Admin lấy danh sách gian hàng đang chờ duyệt' })
+  @ApiGenericResponse(ShopResponseDto, 'Lấy danh sách chờ duyệt thành công.', {
+    isArray: true,
+  })
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Yêu cầu quyền ADMIN.' })
   getPendingShops() {
@@ -259,6 +269,7 @@ export class ShopsController {
   @Roles(UserRole.ADMIN)
   @ResponseMessage('Lấy chi tiết gian hàng thành công.')
   @ApiOperation({ summary: 'Admin xem chi tiết một gian hàng' })
+  @ApiGenericResponse(ShopResponseDto, 'Lấy chi tiết gian hàng thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Yêu cầu quyền ADMIN.' })
   findOneAdmin(@Param('id') id: string) {
@@ -269,6 +280,7 @@ export class ShopsController {
   @Roles(UserRole.ADMIN)
   @ResponseMessage('Đã duyệt gian hàng thành công.')
   @ApiOperation({ summary: 'Admin duyệt gian hàng' })
+  @ApiGenericResponse(ShopResponseDto, 'Duyệt gian hàng thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Yêu cầu quyền ADMIN.' })
   approveShop(@Param('id') id: string) {
@@ -279,9 +291,11 @@ export class ShopsController {
   @Roles(UserRole.ADMIN)
   @ResponseMessage('Đã từ chối gian hàng.')
   @ApiOperation({ summary: 'Admin từ chối gian hàng' })
+  @ApiGenericResponse(ShopResponseDto, 'Từ chối gian hàng thành công.')
   @ApiUnauthorizedResponse({ description: 'Chưa đăng nhập.' })
   @ApiForbiddenResponse({ description: 'Yêu cầu quyền ADMIN.' })
   rejectShop(@Param('id') id: string, @Body('reason') reason: string) {
     return this.shopsService.rejectShop(id, reason);
   }
 }
+

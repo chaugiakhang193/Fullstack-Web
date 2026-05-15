@@ -5,16 +5,24 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateShopDto } from './dto/create-shop.dto';
-import { UpdateShopDto } from './dto/update-shop.dto';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Shop } from './entities/shop.entity';
 import { DataSource, In, Repository } from 'typeorm';
-import { Category } from '../products/entities/category.entity';
-import { User } from '../users/entities/user.entity';
-import { AccountStatus, AssetType } from '../enums';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
+
+// DTOs
+import { CreateShopDto } from '@/modules/shops/dto/create-shop.dto';
+import { UpdateShopDto } from '@/modules/shops/dto/update-shop.dto';
+
+// Entities
+import { Shop } from '@/modules/shops/entities/shop.entity';
+import { Category } from '@/modules/products/entities/category.entity';
+import { User } from '@/modules/users/entities/user.entity';
+
+// Services
+import { CloudinaryService } from '@/modules/cloudinary/cloudinary.service';
 import { UsersService } from '@/modules/users/users.service';
+
+// Enums
+import { AccountStatus, AssetType } from '@/modules/enums';
 
 @Injectable()
 export class ShopsService {

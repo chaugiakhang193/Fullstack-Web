@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CategoryResponseDto } from '../../products/dto/category-response.dto';
-import { AccountStatus, AssetType } from '../../enums';
+import { CategoryResponseDto } from '@/modules/products/dto/category-response.dto';
+import { AccountStatus, AssetType } from '@/modules/enums';
 
 export class UserResponseDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440002' })

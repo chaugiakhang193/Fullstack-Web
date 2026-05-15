@@ -1,5 +1,4 @@
-import { PartialType, PickType } from '@nestjs/swagger';
-import { CreateShopDto } from './create-shop.dto';
+import { PartialType } from '@nestjs/swagger';
+import { CreateShopDto } from '@/modules/shops/dto/create-shop.dto';
 
 export class UpdateShopDto extends PartialType(CreateShopDto) {}
-

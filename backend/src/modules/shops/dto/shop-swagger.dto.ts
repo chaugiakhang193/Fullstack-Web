@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { CreateShopDto } from './create-shop.dto';
+import { CreateShopDto } from '@/modules/shops/dto/create-shop.dto';
 
 export class SetupShopSwaggerDto extends CreateShopDto {
   @ApiProperty({

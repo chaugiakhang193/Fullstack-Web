@@ -331,48 +331,82 @@ export class ShopsService {
 
   async updateLogo(userId: string, file: Express.Multer.File) {
     const shop = await this.findOneByUserId(userId);
+    let newAssetResult: any = null;
 
-    if (shop.logo_url) {
-      const oldAsset = await this.cloudinaryService.findAssetByUrl(
-        shop.logo_url,
+    try {
+      newAssetResult = await this.cloudinaryService.uploadFile(
+        file,
+        'shop_logos',
+        userId,
+        AssetType.SHOP_LOGO,
+        shop.id,
       );
-      if (oldAsset) {
-        await this.cloudinaryService.deleteAsset(oldAsset.id, userId);
-      }
-    }
 
-    const result = await this.cloudinaryService.uploadFile(
-      file,
-      'shop_logos',
-      userId,
-      AssetType.SHOP_LOGO,
-      shop.id,
-    );
-    await this.shopsRepository.update(shop.id, { logo_url: result.url });
-    return await this.findOneByUserId(userId);
+      await this.shopsRepository.update(shop.id, {
+        logo_url: newAssetResult.url,
+      });
+
+      if (shop.logo_url) {
+        const oldAsset = await this.cloudinaryService.findAssetByUrl(
+          shop.logo_url,
+        );
+        if (oldAsset) {
+          await this.cloudinaryService
+            .deleteAsset(oldAsset.id, userId)
+            .catch((e) => console.error(e));
+        }
+      }
+
+      return await this.findOneByUserId(userId);
+    } catch (error) {
+      if (newAssetResult) {
+        await this.cloudinaryService
+          .deleteAsset(newAssetResult.id, userId)
+          .catch((e) => console.error(e));
+      }
+      throw new InternalServerErrorException('Có lỗi xảy ra khi cập nhật logo');
+    }
   }
 
   async updateBanner(userId: string, file: Express.Multer.File) {
     const shop = await this.findOneByUserId(userId);
+    let newAssetResult: any = null;
 
-    if (shop.banner_url) {
-      const oldAsset = await this.cloudinaryService.findAssetByUrl(
-        shop.banner_url,
+    try {
+      newAssetResult = await this.cloudinaryService.uploadFile(
+        file,
+        'shop_banners',
+        userId,
+        AssetType.SHOP_BANNER,
+        shop.id,
       );
-      if (oldAsset) {
-        await this.cloudinaryService.deleteAsset(oldAsset.id, userId);
-      }
-    }
 
-    const result = await this.cloudinaryService.uploadFile(
-      file,
-      'shop_banners',
-      userId,
-      AssetType.SHOP_BANNER,
-      shop.id,
-    );
-    await this.shopsRepository.update(shop.id, { banner_url: result.url });
-    return await this.findOneByUserId(userId);
+      await this.shopsRepository.update(shop.id, {
+        banner_url: newAssetResult.url,
+      });
+
+      if (shop.banner_url) {
+        const oldAsset = await this.cloudinaryService.findAssetByUrl(
+          shop.banner_url,
+        );
+        if (oldAsset) {
+          await this.cloudinaryService
+            .deleteAsset(oldAsset.id, userId)
+            .catch((e) => console.error(e));
+        }
+      }
+
+      return await this.findOneByUserId(userId);
+    } catch (error) {
+      if (newAssetResult) {
+        await this.cloudinaryService
+          .deleteAsset(newAssetResult.id, userId)
+          .catch((e) => console.error(e));
+      }
+      throw new InternalServerErrorException(
+        'Có lỗi xảy ra khi cập nhật banner',
+      );
+    }
   }
 
   async addGalleryImages(userId: string, files: Express.Multer.File[]) {
@@ -392,18 +426,55 @@ export class ShopsService {
       );
     }
 
-    await this.cloudinaryService.uploadMultipleFiles(
-      files,
-      'shop_galleries',
-      userId,
-      AssetType.SHOP_GALLERY,
-      shop.id,
-    );
+    const uploadedAssets: { id: string; public_id: string }[] = [];
 
-    return await this.shopsRepository.findOne({
-      where: { id: shop.id },
-      relations: ['gallery'],
-    });
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const galleryResult = await this.cloudinaryService.uploadFile(
+          file,
+          'shop_galleries',
+          userId,
+          AssetType.SHOP_GALLERY,
+          shop.id,
+        );
+
+        uploadedAssets.push({
+          id: galleryResult.id,
+          public_id: galleryResult.public_id,
+        });
+      });
+
+      const results = await Promise.allSettled(uploadPromises);
+      const hasError = results.some((result) => result.status === 'rejected');
+
+      if (hasError) {
+        throw new Error('Có lỗi xảy ra trong quá trình upload ảnh Gallery');
+      }
+
+      return await this.shopsRepository.findOne({
+        where: { id: shop.id },
+        relations: ['gallery'],
+      });
+    } catch (error) {
+      if (uploadedAssets.length > 0) {
+        // 1. Xóa file Cloudinary
+        Promise.allSettled(
+          uploadedAssets.map((asset) =>
+            this.cloudinaryService.deleteFile(asset.public_id),
+          ),
+        ).catch((e) => console.error(e));
+
+        // 2. Xóa bản ghi DB
+        const assetIdsToDelete = uploadedAssets.map((asset) => asset.id);
+        this.dataSource.manager
+          .delete('MediaAsset', { id: In(assetIdsToDelete) })
+          .catch((e) => console.error(e));
+      }
+
+      throw new InternalServerErrorException(
+        'Hệ thống gặp sự cố khi upload ảnh. Vui lòng thử lại!',
+      );
+    }
   }
 
   async removeGalleryImage(userId: string, assetId: string) {

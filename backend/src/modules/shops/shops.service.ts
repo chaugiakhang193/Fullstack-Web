@@ -214,8 +214,8 @@ export class ShopsService {
       return await this.findOneByShopId(savedShop.id);
     } catch (error) {
       // NẾU CÓ LỖI THÌ BẮT ĐẦU DỌN RÁC
-      // Dựa trên danh sách uploadedAssetIds để xem có file nào được upload trước khi xảy ra lỗi không
       if (uploadedAssets.length > 0) {
+        // Xóa toàn bộ file rác vật lý trên Cloudinary
         Promise.allSettled(
           uploadedAssets.map((asset) =>
             this.cloudinaryService.deleteFile(asset.public_id),
@@ -223,6 +223,17 @@ export class ShopsService {
         ).catch((cleanupError) => {
           console.error('Lỗi khi dọn rác Cloudinary:', cleanupError);
         });
+
+        // Xóa toàn bộ bản ghi MediaAsset rác trong Database
+        const assetIdsToDelete = uploadedAssets.map((asset) => asset.id);
+        this.dataSource.manager
+          .delete('MediaAsset', { id: In(assetIdsToDelete) })
+          .catch((dbCleanupError) => {
+            console.error(
+              'Lỗi khi dọn rác bản ghi MediaAsset:',
+              dbCleanupError,
+            );
+          });
       }
       if (savedShopId) {
         //Nếu lỗi xảy ra sau khi đã tạo được shop thì xóa shop đó đi để tránh dữ liệu rác trong database

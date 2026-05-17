@@ -24,6 +24,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      transform: true, // Thêm dòng này để kích hoạt auto-transform
     }),
   );
 

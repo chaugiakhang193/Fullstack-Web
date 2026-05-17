@@ -55,3 +55,8 @@ export enum AssetType {
   PRODUCT_IMAGE = 'product_image',
   USER_AVATAR = 'user_avatar',
 }
+
+export enum ProductStatus {
+  ACTIVE = 'active',
+  DELETED = 'deleted',
+}

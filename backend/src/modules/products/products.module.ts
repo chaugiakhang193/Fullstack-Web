@@ -1,15 +1,29 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ProductsService } from './products.service';
-import { ProductsController } from './products.controller';
-import { Product } from './entities/product.entity';
-import { Category } from './entities/category.entity';
-import { ProductVariant } from './entities/product-variant.entity';
-import { CategoriesService } from './categories.service';
-import { CategoriesController } from './categories.controller';
+
+// Services
+import { ProductsService } from '@/modules/products/products.service';
+import { CategoriesService } from '@/modules/products/categories.service';
+
+// Controllers
+import { ProductsController } from '@/modules/products/products.controller';
+import { CategoriesController } from '@/modules/products/categories.controller';
+
+// Entities
+import { Product } from '@/modules/products/entities/product.entity';
+import { Category } from '@/modules/products/entities/category.entity';
+import { ProductVariant } from '@/modules/products/entities/product-variant.entity';
+
+// Modules
+import { CloudinaryModule } from '@/modules/cloudinary/cloudinary.module';
+import { ShopsModule } from '@/modules/shops/shops.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, Category, ProductVariant])],
+  imports: [
+    TypeOrmModule.forFeature([Product, Category, ProductVariant]),
+    CloudinaryModule,
+    ShopsModule,
+  ],
   controllers: [ProductsController, CategoriesController],
   providers: [ProductsService, CategoriesService],
   exports: [CategoriesService],

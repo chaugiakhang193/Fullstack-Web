@@ -8,9 +8,6 @@ import {
   Delete,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { CategoriesService } from './categories.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -19,11 +16,22 @@ import {
   ApiUnauthorizedResponse,
   ApiResponse,
 } from '@nestjs/swagger';
+
+// Services
+import { CategoriesService } from '@/modules/products/categories.service';
+
+// DTOs
+import { CreateCategoryDto } from '@/modules/products/dto/create-category.dto';
+import { UpdateCategoryDto } from '@/modules/products/dto/update-category.dto';
+import { CategoryResponseDto } from '@/modules/products/dto/category-response.dto';
+
+// Guards & Decorators
 import { Roles } from '@/decorator/roles.decorator';
-import { UserRole } from '../enums';
 import { ResponseMessage, Public } from '@/decorator/customize';
 import { ApiGenericResponse } from '@/decorator/api-response.decorator';
-import { CategoryResponseDto } from './dto/category-response.dto';
+
+// Enums
+import { UserRole } from '@/modules/enums';
 
 
 @ApiTags('categories')

@@ -21,9 +21,15 @@ export class ProductVariant {
   @Column({ nullable: true })
   name: string;
 
+  @Column({ nullable: true })
+  sku: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   additional_price: number;
 
   @Column({ type: 'int', nullable: true })
   stock_quantity: number;
+
+  @Column({ type: 'simple-array', nullable: true })
+  images: string[];
 }
